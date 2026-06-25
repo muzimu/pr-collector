@@ -1,0 +1,37 @@
+shturl.cc {
+    tls admin@shturl.cc
+
+    # /card 接口：强缓存 + 限流
+    @card {
+        path /card
+    }
+    route @card {
+        header Cache-Control "public, max-age=86400, immutable"
+        rate_limit {
+            zone dynamic {
+                key {remote_host}
+                events 10
+                window 1s
+            }
+        }
+        reverse_proxy localhost:8080
+    }
+
+    # /pr /refresh 接口：限流
+    @pr {
+        path /pr /refresh
+    }
+    route @pr {
+        rate_limit {
+            zone dynamic {
+                key {remote_host}
+                events 5
+                window 1s
+            }
+        }
+        reverse_proxy localhost:8080
+    }
+
+    # /health 不限制
+    reverse_proxy localhost:8080
+}

@@ -1,0 +1,29 @@
+# 二进制
+pr-collector
+*.exe
+
+# 配置（包含敏感 token）
+config.yaml
+
+# 日志
+logs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Go
+vendor/
+
+# 依赖锁（go.sum 需提交）
+# go.sum
+
+# 临时文件
+*.tmp
+.DS_Store
+
+# 环境变量
+.env
+.env.local

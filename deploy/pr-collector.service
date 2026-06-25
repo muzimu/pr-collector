@@ -1,0 +1,24 @@
+[Unit]
+Description=PR Collector - GitHub PR Badge Service
+After=network.target redis.service
+
+[Service]
+Type=simple
+User=www
+Group=www
+WorkingDirectory=/opt/pr-collector
+ExecStart=/opt/pr-collector/pr-collector
+Restart=always
+RestartSec=5
+StandardOutput=append:/opt/pr-collector/logs/stdout.log
+StandardError=append:/opt/pr-collector/logs/stderr.log
+LimitNOFILE=65536
+
+# 安全加固
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/pr-collector/logs /tmp
+
+[Install]
+WantedBy=multi-user.target

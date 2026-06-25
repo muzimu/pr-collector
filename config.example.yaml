@@ -1,0 +1,32 @@
+# PR Collector 配置文件模板
+# 复制为 config.yaml 并填入真实值
+
+server:
+  port: 8080                     # Gin 监听端口
+  mode: release                  # gin 运行模式: debug / release / test
+
+github:
+  token: "ghp_xxxxxxxxxxxx"      # GitHub Personal Access Token (classic, scopes: read:user)
+
+redis:
+  addr: "127.0.0.1:6379"         # Redis 地址
+  password: ""                   # Redis 密码 (留空无密码)
+  db: 0                          # Redis DB 编号
+  pool_size: 20                  # 连接池大小
+
+cron:
+  full_sync: "0 0 3 * * *"       # 全量同步 cron (秒 分 时 日 月 周), 默认凌晨3点
+  svg_cache_ttl: 24h             # SVG 缓存过期时间
+  fetch_lock_ttl: 60s            # 抓取分布式锁过期时间
+  max_workers: 5                 # 批量同步最大并发协程数
+
+log:
+  level: info                    # 日志级别: debug / info / warn / error
+  file: logs/app.log             # 日志文件路径
+  max_size: 50                   # 单文件最大 MB
+  max_backups: 7                 # 最多保留日志文件数
+  max_age: 30                    # 日志保留天数
+
+ratelimit:
+  card_rps: 10                   # /card 接口每秒最大请求数
+  pr_rps: 5                      # /pr 接口每秒最大请求数
