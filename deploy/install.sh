@@ -17,12 +17,11 @@ sudo mkdir -p "$APP_DIR/logs"
 # 3. 复制文件
 echo "[3/5] Copying files..."
 sudo cp "$BINARY" "$APP_DIR/"
-if [ ! -f "$APP_DIR/config.yaml" ]; then
-    sudo cp config.example.yaml "$APP_DIR/config.yaml"
-    echo "  -> 已创建 config.yaml，请编辑填入 GitHub Token: $APP_DIR/config.yaml"
-else
-    echo "  -> config.yaml 已存在，跳过"
+if [ ! -f "config.yaml" ]; then
+    echo "错误: config.yaml 不存在，请先创建配置文件后重试"
+    exit 1
 fi
+sudo cp config.yaml "$APP_DIR/"
 
 # 4. 安装 systemd 服务
 echo "[4/5] Installing systemd service..."
@@ -39,4 +38,4 @@ sudo systemctl status pr-collector --no-pager
 echo ""
 echo "部署完成！"
 echo "  查看日志: journalctl -u pr-collector -f"
-echo "  编辑配置: vim $APP_DIR/config.yaml 后 systemctl restart pr-collector"
+echo "  编辑配置: nano $APP_DIR/config.yaml 后 systemctl restart pr-collector"
