@@ -1,11 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="400" height="{{if .TopRepos}}200{{else}}120{{end}}">
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="{{.Height}}">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" style="stop-color:#0d1117"/>
       <stop offset="100%" style="stop-color:#161b22"/>
     </linearGradient>
   </defs>
-  <rect width="400" height="{{if .TopRepos}}200{{else}}120{{end}}" rx="12" fill="url(#bg)"/>
+  <rect width="400" height="{{.Height}}" rx="12" fill="url(#bg)"/>
 
   <text x="30" y="40" font-size="28">🐙</text>
   <text x="70" y="32" fill="#8b949e" font-size="14" font-family="Arial,sans-serif">

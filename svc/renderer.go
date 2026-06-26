@@ -30,6 +30,7 @@ type SVGBadgeData struct {
 	TotalPRs   int
 	TotalRepos int
 	TopRepos   []RepoInfo // 按 Stars 降序的 Top N 仓库，空则不展示仓库列表
+	Height     int        // SVG 高度，根据 TopRepos 数量自动计算
 }
 
 // Renderer SVG 和 HTML 模板渲染器
@@ -132,6 +133,13 @@ func (r *Renderer) RenderSVG(username, style string, prs []github.PRInfo, topN i
 				PRCount: sorted[i].count,
 			}
 		}
+	}
+
+	// 自适应高度：基础 120px，每个仓库行 +22px
+	if len(data.TopRepos) > 0 {
+		data.Height = 120 + len(data.TopRepos)*22
+	} else {
+		data.Height = 120
 	}
 
 	tmpl, ok := r.svgTemplates[style]
