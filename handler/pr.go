@@ -5,7 +5,6 @@ import (
 	"sort"
 
 	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
 
 	"pr-collector/github"
@@ -25,15 +24,17 @@ type RepoGroup struct {
 type PRHandler struct {
 	store    *cache.Store
 	renderer *svc.Renderer
+	provider *svc.PRProvider
 	fetcher  *svc.Fetcher
 	log      zerolog.Logger
 }
 
 // NewPRHandler 创建 PR 页面处理器
-func NewPRHandler(store *cache.Store, renderer *svc.Renderer, fetcher *svc.Fetcher, log zerolog.Logger) *PRHandler {
+func NewPRHandler(store *cache.Store, renderer *svc.Renderer, provider *svc.PRProvider, fetcher *svc.Fetcher, log zerolog.Logger) *PRHandler {
 	return &PRHandler{
 		store:    store,
 		renderer: renderer,
+		provider: provider,
 		fetcher:  fetcher,
 		log:      log,
 	}
@@ -52,23 +53,14 @@ func (h *PRHandler) HandlePRPage(c *gin.Context) {
 	ctx := c.Request.Context()
 	h.store.IncrPRVisits(ctx, username)
 
-	prs, err := h.store.GetPRList(ctx, username)
+	// 获取 PR 数据（优先缓存，缓存未命中则同步抓取）
+	prs, err := h.provider.GetOrFetch(ctx, username)
 	if err != nil {
-		if err == redis.Nil {
-			c.HTML(http.StatusOK, "empty.html", gin.H{
-				"Username": username,
-			})
-			return
-		}
-		h.log.Error().Err(err).Str("user", username).Msg("redis error getting pr list")
 		c.HTML(http.StatusInternalServerError, "error.html", gin.H{
-			"message": "数据服务暂不可用，请稍后重试",
+			"message": "数据抓取失败，请稍后重试",
 		})
 		return
 	}
-
-	// 仅展示已合并的 PR
-	prs = filterMerged(prs)
 
 	if len(prs) == 0 {
 		c.HTML(http.StatusOK, "empty.html", gin.H{
@@ -77,13 +69,11 @@ func (h *PRHandler) HandlePRPage(c *gin.Context) {
 		return
 	}
 
-	// 按仓库分组，按 Stars 降序排列
 	groups := groupByRepo(prs)
-
 	c.HTML(http.StatusOK, "pr_list.html", gin.H{
-		"Username": username,
-		"Groups":   groups,
-		"TotalPRs": len(prs),
+		"Username":   username,
+		"Groups":     groups,
+		"TotalPRs":   len(prs),
 		"TotalRepos": len(groups),
 	})
 }
@@ -106,17 +96,6 @@ func (h *PRHandler) HandleRefresh(c *gin.Context) {
 		"message":   "刷新任务已提交，请稍后刷新页面",
 		"submitted": submitted,
 	})
-}
-
-// filterMerged 过滤仅保留已合并的 PR
-func filterMerged(prs []github.PRInfo) []github.PRInfo {
-	out := make([]github.PRInfo, 0, len(prs))
-	for _, pr := range prs {
-		if pr.State == "MERGED" {
-			out = append(out, pr)
-		}
-	}
-	return out
 }
 
 // groupByRepo 将 PR 列表按仓库分组，按 Stars 降序排列（参考 pr-collector-py 的输出格式）

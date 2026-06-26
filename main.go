@@ -78,6 +78,9 @@ func main() {
 
 	fetcher := svc.NewFetcherWithContext(appCtx, store, ghClient, cfg.Cron.FetchLockTTL, log)
 
+	// PR 数据提供者：封装"优先缓存，缓存未命中则同步抓取"逻辑
+	prProvider := svc.NewPRProvider(store, fetcher, 20*time.Second, log)
+
 	renderer, err := svc.NewRenderer()
 	if err != nil {
 		log.Fatal().Err(err).Msg("renderer init failed")
@@ -101,8 +104,8 @@ func main() {
 	prLimiter := middleware.NewRateLimiter(cfg.RateLimit.PRRPS, log)
 
 	// 处理器
-	cardHandler := handler.NewCardHandler(store, renderer, fetcher, cfg.Cron.SVGCacheTTL, log)
-	prHandler := handler.NewPRHandler(store, renderer, fetcher, log)
+	cardHandler := handler.NewCardHandler(store, renderer, prProvider, cfg.Cron.SVGCacheTTL, log)
+	prHandler := handler.NewPRHandler(store, renderer, prProvider, fetcher, log)
 
 	// HTML 模板
 	router.SetHTMLTemplate(renderer.HTMLTemplate())
