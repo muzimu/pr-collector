@@ -44,11 +44,14 @@ func NewPRHandler(store *cache.Store, renderer *svc.Renderer, provider *svc.PRPr
 func (h *PRHandler) HandlePRPage(c *gin.Context) {
 	username := c.Query("username")
 	if username == "" {
+		h.log.Warn().Str("client_ip", c.ClientIP()).Msg("[GET /pr] missing username")
 		c.HTML(http.StatusOK, "error.html", gin.H{
 			"message": "缺少 username 参数",
 		})
 		return
 	}
+
+	h.log.Info().Str("username", username).Str("client_ip", c.ClientIP()).Msg("[GET /pr] request")
 
 	ctx := c.Request.Context()
 	h.store.IncrPRVisits(ctx, username)
@@ -56,6 +59,7 @@ func (h *PRHandler) HandlePRPage(c *gin.Context) {
 	// 获取 PR 数据（优先缓存，缓存未命中则同步抓取）
 	prs, err := h.provider.GetOrFetch(ctx, username)
 	if err != nil {
+		h.log.Error().Err(err).Str("username", username).Msg("[GET /pr] fetch failed")
 		c.HTML(http.StatusInternalServerError, "error.html", gin.H{
 			"message": "数据抓取失败，请稍后重试",
 		})
@@ -63,6 +67,7 @@ func (h *PRHandler) HandlePRPage(c *gin.Context) {
 	}
 
 	if len(prs) == 0 {
+		h.log.Info().Str("username", username).Msg("[GET /pr] no PRs found")
 		c.HTML(http.StatusOK, "empty.html", gin.H{
 			"Username": username,
 		})
@@ -70,6 +75,7 @@ func (h *PRHandler) HandlePRPage(c *gin.Context) {
 	}
 
 	groups := groupByRepo(prs)
+	h.log.Info().Str("username", username).Int("total_prs", len(prs)).Int("total_repos", len(groups)).Msg("[GET /pr] ok")
 	c.HTML(http.StatusOK, "pr_list.html", gin.H{
 		"Username":   username,
 		"Groups":     groups,
@@ -82,6 +88,7 @@ func (h *PRHandler) HandlePRPage(c *gin.Context) {
 func (h *PRHandler) HandleRefresh(c *gin.Context) {
 	username := c.PostForm("username")
 	if username == "" {
+		h.log.Warn().Str("client_ip", c.ClientIP()).Msg("[POST /refresh] missing username")
 		c.JSON(http.StatusBadRequest, gin.H{
 			"ok":      false,
 			"message": "缺少 username",
@@ -89,7 +96,14 @@ func (h *PRHandler) HandleRefresh(c *gin.Context) {
 		return
 	}
 
+	h.log.Info().Str("username", username).Str("client_ip", c.ClientIP()).Msg("[POST /refresh] request")
+
 	submitted := h.fetcher.SubmitFetch(username)
+	if submitted {
+		h.log.Info().Str("username", username).Msg("[POST /refresh] submitted")
+	} else {
+		h.log.Info().Str("username", username).Msg("[POST /refresh] rejected (queue full)")
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"ok":        submitted,
