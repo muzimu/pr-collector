@@ -45,7 +45,6 @@ func NewClient(token string, log zerolog.Logger) *Client {
 }
 
 // FetchAllPRs 获取用户全部 PR（处理分页和限流重试）
-// 参考 pr-collector-py/main.py 的 _graphql_request 重试逻辑
 func (c *Client) FetchAllPRs(username string) ([]PRInfo, error) {
 	const query = `
 query($queryString: String!, $cursor: String) {
@@ -155,7 +154,7 @@ query($queryString: String!, $cursor: String) {
 	c.log.Info().
 		Str("user", username).
 		Int("count", len(allPRs)).
-		Msg("fetch completed")
+		Msg("github api fetch completed")
 
 	return allPRs, nil
 }

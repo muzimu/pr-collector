@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PR Collector - GitHub PR 贡献者排行榜</title>
+  <meta name="description" content="基于 PR 数量与仓库 Star 的综合评分排行榜">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text-primary: #1e293b;
+      --text-secondary: #52525b;
+      --text-tertiary: #71717b;
+      --accent: #ea580c;
+      --accent-hover: #c2410c;
+      --green: #00bb7f;
+      --border: #e2e8f0;
+      --bg-secondary: #f6f8fb;
+      --gold: #f59e0b;
+      --silver: #94a3b8;
+      --bronze: #d2926a;
+      --header-height: 64px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text-primary);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    a { text-decoration: none; color: inherit; }
+
+    /* Header */
+    .header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: var(--header-height);
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      z-index: 100;
+    }
+
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      height: 100%;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .nav-item {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      padding: 8px 0;
+      position: relative;
+    }
+
+    .nav-item.active {
+      color: var(--accent);
+    }
+
+    .nav-item.active::after {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 28px;
+      height: 2px;
+      background: var(--accent);
+      border-radius: 1px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      padding: 8px 16px;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    .btn-outline {
+      background: #fff;
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      padding: 8px 24px;
+    }
+
+    .btn-outline:hover {
+      background: var(--bg-secondary);
+    }
+
+    .btn-sm {
+      background: #fff;
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      font-size: 12px;
+      gap: 4px;
+    }
+
+    .btn-sm:hover {
+      background: var(--bg-secondary);
+    }
+
+    .btn-block {
+      width: 100%;
+      height: 40px;
+    }
+
+    /* Content */
+    .content {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: calc(var(--header-height) + 48px) 24px 48px;
+    }
+
+    /* Hero */
+    .hero {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+
+    .hero h1 {
+      font-size: 48px;
+      font-weight: 800;
+      color: var(--accent);
+      margin-bottom: 12px;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      font-size: 18px;
+      color: var(--text-secondary);
+      margin-bottom: 32px;
+    }
+
+    .stats-row {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .stat-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 24px;
+      min-width: 160px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .stat-icon {
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+
+    /* Main grid */
+    .main-grid {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+    }
+
+    .leaderboard {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .sidebar {
+      width: 280px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Table */
+    .table-container {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .table-header,
+    .table-row {
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      height: 56px;
+    }
+
+    .table-header {
+      background: var(--bg-secondary);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .table-row {
+      border-top: 1px solid var(--border);
+      position: relative;
+      transition: background 0.2s ease;
+    }
+
+    .table-row:hover {
+      background: var(--bg-secondary);
+    }
+
+    .table-row.rank-1::before,
+    .table-row.rank-2::before,
+    .table-row.rank-3::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+    }
+
+    .table-row.rank-1::before { background: var(--gold); }
+    .table-row.rank-2::before { background: var(--silver); }
+    .table-row.rank-3::before { background: var(--bronze); }
+
+    .col-rank {
+      width: 44px;
+      text-align: center;
+      flex-shrink: 0;
+      font-size: 16px;
+    }
+
+    .col-user {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .col-user a {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: var(--bg-secondary);
+    }
+
+    .username {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .col-score {
+      width: 180px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .score-value {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .score-high { color: var(--green); }
+    .score-normal { color: var(--accent); }
+
+    .score-bar {
+      width: 60px;
+      height: 4px;
+      background: rgba(15, 23, 42, 0.13);
+      border-radius: 2px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .score-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.6s ease;
+    }
+
+    .score-high + .score-bar .score-bar-fill { background: var(--green); }
+    .score-normal + .score-bar .score-bar-fill { background: var(--accent); }
+
+    .col-pr,
+    .col-repos {
+      width: 80px;
+      text-align: right;
+      flex-shrink: 0;
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .col-arrow {
+      width: 44px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .arrow {
+      font-size: 16px;
+      color: var(--accent);
+      display: inline-block;
+      transition: transform 0.2s ease;
+    }
+
+    .arrow:hover {
+      transform: translateX(3px);
+    }
+
+    .load-more {
+      display: flex;
+      justify-content: center;
+      margin-top: 20px;
+    }
+
+    .empty-state {
+      padding: 48px 16px;
+      text-align: center;
+      color: var(--text-tertiary);
+      font-size: 14px;
+    }
+
+    /* Sidebar cards */
+    .card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .card h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 16px;
+    }
+
+    .repo-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .repo-row span:first-child {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .star-count {
+      font-size: 12px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+
+    .lang-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+
+    .lang-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .card input[type="text"] {
+      width: 100%;
+      height: 40px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-secondary);
+      font-family: inherit;
+      font-size: 13px;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+      outline: none;
+    }
+
+    .card input[type="text"]::placeholder {
+      color: var(--text-tertiary);
+    }
+
+    .card input[type="text"]:focus {
+      border-color: var(--accent);
+    }
+
+    .preview-card {
+      min-height: 80px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 16px 0;
+      padding: 12px;
+    }
+
+    .preview-card img {
+      max-width: 100%;
+      height: auto;
+    }
+
+    .preview-placeholder {
+      font-size: 14px;
+      color: var(--text-tertiary);
+    }
+
+    .code-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .code-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-tertiary);
+    }
+
+    .code-block {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      font-family: "SF Mono", "Fira Code", Menlo, Consolas, monospace;
+      font-size: 11px;
+      color: var(--text-secondary);
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    /* Footer */
+    .footer {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px 48px;
+      text-align: center;
+    }
+
+    .footer-divider {
+      height: 1px;
+      background: var(--border);
+      margin-bottom: 24px;
+    }
+
+    .footer p {
+      font-size: 13px;
+      color: var(--text-tertiary);
+    }
+
+    .footer a {
+      color: var(--text-tertiary);
+    }
+
+    .footer a:hover {
+      color: var(--accent);
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      top: 80px;
+      right: 24px;
+      background: var(--text-primary);
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      opacity: 0;
+      transform: translateY(-10px);
+      transition: all 0.3s ease;
+      pointer-events: none;
+      z-index: 200;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .main-grid {
+        flex-direction: column;
+      }
+
+      .sidebar {
+        width: 100%;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .hero h1 {
+        font-size: 32px;
+      }
+
+      .subtitle {
+        font-size: 15px;
+      }
+
+      .col-repos,
+      .col-arrow {
+        display: none;
+      }
+
+      .col-score {
+        width: 100px;
+      }
+
+      .score-bar {
+        display: none;
+      }
+
+      .header-inner {
+        padding: 0 16px;
+      }
+
+      .nav {
+        display: none;
+      }
+
+      .content {
+        padding: calc(var(--header-height) + 32px) 16px 32px;
+      }
+    }
+
+    /* Animations */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .table-row {
+      animation: fadeInUp 0.4s ease forwards;
+      opacity: 0;
+    }
+
+    .table-row:nth-child(1) { animation-delay: 0s; }
+    .table-row:nth-child(2) { animation-delay: 0.03s; }
+    .table-row:nth-child(3) { animation-delay: 0.06s; }
+    .table-row:nth-child(4) { animation-delay: 0.09s; }
+    .table-row:nth-child(5) { animation-delay: 0.12s; }
+    .table-row:nth-child(6) { animation-delay: 0.15s; }
+    .table-row:nth-child(7) { animation-delay: 0.18s; }
+    .table-row:nth-child(8) { animation-delay: 0.21s; }
+    .table-row:nth-child(9) { animation-delay: 0.24s; }
+    .table-row:nth-child(10) { animation-delay: 0.27s; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <a href="/" class="logo">🏆 PR Collector</a>
+      <nav class="nav">
+        <a href="/" class="nav-item active">排行榜</a>
+        <a href="#about" class="nav-item">关于</a>
+      </nav>
+      <a href="#readme-card" class="btn btn-primary">在 Github README 中添加</a>
+    </div>
+  </header>
+
+  <main class="content">
+    <section class="hero">
+      <h1>GitHub PR 贡献者排行榜</h1>
+      <p class="subtitle">基于 PR 数量与仓库 Star 的综合评分</p>
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-icon">👥</div>
+          <div class="stat-value" data-target="{{.Stats.TotalUsers}}">0</div>
+          <div class="stat-label">开发者</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📦</div>
+          <div class="stat-value" data-target="{{.Stats.TotalPRs}}">0</div>
+          <div class="stat-label">Pull Requests</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">⭐</div>
+          <div class="stat-value" data-target="{{.Stats.TotalRepos}}">0</div>
+          <div class="stat-label">仓库</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="main-grid">
+      <section class="leaderboard">
+        <div class="table-container">
+          <div class="table-header">
+            <div class="col-rank">#</div>
+            <div class="col-user">用户</div>
+            <div class="col-score">综合评分</div>
+            <div class="col-pr">PR数</div>
+            <div class="col-repos">仓库数</div>
+            <div class="col-arrow"></div>
+          </div>
+          <div id="leaderboard-body">
+            {{range .Users}}
+            <div class="table-row rank-{{if le .Rank 3}}{{.Rank}}{{end}}" data-username="{{.Username}}">
+              <div class="col-rank">
+                {{if eq .Rank 1}}🥇{{else if eq .Rank 2}}🥈{{else if eq .Rank 3}}🥉{{else}}{{.Rank}}{{end}}
+              </div>
+              <div class="col-user">
+                <a href="https://github.com/{{.Username}}" target="_blank" rel="noopener">
+                  <img class="avatar" src="https://avatars.githubusercontent.com/{{.Username}}" alt="{{.Username}}" onerror="this.style.display='none'">
+                  <span class="username">@{{.Username}}</span>
+                </a>
+              </div>
+              <div class="col-score">
+                <span class="score-value {{if ge .Score 90.0}}score-high{{else}}score-normal{{end}}">{{.Score}}</span>
+                <div class="score-bar">
+                  <div class="score-bar-fill" style="width: {{.Score}}%"></div>
+                </div>
+              </div>
+              <div class="col-pr">{{.PRCount}}</div>
+              <div class="col-repos">{{.RepoCount}}</div>
+              <div class="col-arrow">
+                <a href="/pr?username={{.Username}}" class="arrow">→</a>
+              </div>
+            </div>
+            {{end}}
+            {{if eq (len .Users) 0}}
+            <div class="empty-state">当前榜单为空</div>
+            {{end}}
+          </div>
+        </div>
+        <div class="load-more">
+          <button id="load-more-btn" class="btn btn-outline">加载更多</button>
+        </div>
+      </section>
+
+      <aside class="sidebar">
+        <div class="card">
+          <h3>GitHub 项目</h3>
+          <div class="repo-row">
+            <a href="https://github.com/muzimu/pr-collector" target="_blank" rel="noopener" style="font-size:14px;font-weight:500;color:var(--text-primary);">muzimu/pr-collector</a>
+            <span class="star-count">⭐ 本站开源</span>
+          </div>
+          <p class="desc">本网站的开源代码，用于收集和展示 GitHub PR 贡献者排名。</p>
+          <div class="lang-tag">
+            <span class="lang-dot" style="background:#00ADD8"></span>
+            <span>Go</span>
+          </div>
+        </div>
+
+        <div class="card" id="readme-card">
+          <h3>在 Github README 中添加</h3>
+          <p class="desc">生成你的 PR 贡献者排名卡片，一键嵌入到 GitHub README 中展示。</p>
+          <input type="text" id="card-username" placeholder="输入 GitHub 用户名">
+          <button id="generate-card-btn" class="btn btn-primary btn-block">生成卡片</button>
+          <div id="card-preview" class="preview-card">
+            <span class="preview-placeholder">预览将在此显示</span>
+          </div>
+          <div class="code-header">
+            <span class="code-label">Markdown 代码</span>
+            <button id="copy-btn" class="btn btn-sm">📋 一键复制</button>
+          </div>
+          <pre class="code-block"><code id="markdown-output">[![PR Collector]({{.BaseURL}}/card?username=YOUR_USERNAME&style=default)]({{.BaseURL}}/pr?username=YOUR_USERNAME)</code></pre>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <footer class="footer" id="about">
+    <div class="footer-divider"></div>
+    <p>© 2026 PR Collector · <a href="https://github.com/muzimu/pr-collector" target="_blank" rel="noopener">GitHub</a></p>
+  </footer>
+
+  <div id="toast" class="toast">已复制到剪贴板</div>
+
+  <script id="initial-data" type="application/json">
+    {{.InitialData}}
+  </script>
+
+  <script>
+    (function() {
+      const initialData = JSON.parse(document.getElementById('initial-data').textContent || '{}');
+      let users = initialData.users || [];
+      let total = initialData.total || 0;
+      let offset = users.length;
+      const baseURL = (initialData.baseURL || window.location.origin || '').replace(/\/$/, '');
+
+      // 数字滚动动画
+      function animateValue(el) {
+        const target = parseInt(el.dataset.target, 10) || 0;
+        if (target === 0) {
+          el.textContent = '0';
+          return;
+        }
+        const duration = 1500;
+        const start = performance.now();
+        function step(now) {
+          const progress = Math.min((now - start) / duration, 1);
+          el.textContent = Math.floor(progress * target).toLocaleString();
+          if (progress < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+      }
+      document.querySelectorAll('.stat-value').forEach(animateValue);
+
+      // 渲染单行
+      function renderRow(u, rank) {
+        const medal = rank <= 3 ? ['🥇','🥈','🥉'][rank-1] : rank;
+        const scoreClass = u.score >= 90 ? 'score-high' : 'score-normal';
+        const rankClass = rank <= 3 ? 'rank-' + rank : '';
+        return `
+          <div class="table-row ${rankClass}" data-username="${escapeHtml(u.username)}">
+            <div class="col-rank">${medal}</div>
+            <div class="col-user">
+              <a href="https://github.com/${escapeHtml(u.username)}" target="_blank" rel="noopener">
+                <img class="avatar" src="https://avatars.githubusercontent.com/${escapeHtml(u.username)}" alt="${escapeHtml(u.username)}" onerror="this.style.display='none'">
+                <span class="username">@${escapeHtml(u.username)}</span>
+              </a>
+            </div>
+            <div class="col-score">
+              <span class="score-value ${scoreClass}">${u.score}</span>
+              <div class="score-bar"><div class="score-bar-fill" style="width:${u.score}%"></div></div>
+            </div>
+            <div class="col-pr">${u.pr_count}</div>
+            <div class="col-repos">${u.repo_count}</div>
+            <div class="col-arrow"><a href="/pr?username=${escapeHtml(u.username)}" class="arrow">→</a></div>
+          </div>
+        `;
+      }
+
+      function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+
+      // 加载更多
+      const loadMoreBtn = document.getElementById('load-more-btn');
+      if (offset >= total) {
+        loadMoreBtn.style.display = 'none';
+      }
+
+      loadMoreBtn.addEventListener('click', async function() {
+        if (offset >= total) return;
+        loadMoreBtn.disabled = true;
+        loadMoreBtn.textContent = '加载中...';
+        try {
+          const res = await fetch(`/api/leaderboard?limit=50&offset=${offset}`);
+          if (!res.ok) throw new Error('load failed');
+          const data = await res.json();
+          const tbody = document.getElementById('leaderboard-body');
+          const fragment = document.createElement('div');
+          data.users.forEach(function(u, idx) {
+            fragment.innerHTML += renderRow(u, offset + idx + 1);
+          });
+          while (fragment.firstChild) {
+            tbody.appendChild(fragment.firstChild);
+          }
+          offset += data.users.length;
+          total = data.total;
+          if (offset >= total) {
+            loadMoreBtn.style.display = 'none';
+          }
+        } catch (e) {
+          showToast('加载失败，请稍后重试');
+        } finally {
+          loadMoreBtn.disabled = false;
+          loadMoreBtn.textContent = '加载更多';
+        }
+      });
+
+      // 生成卡片
+      const generateBtn = document.getElementById('generate-card-btn');
+      const usernameInput = document.getElementById('card-username');
+      const preview = document.getElementById('card-preview');
+      const markdownOutput = document.getElementById('markdown-output');
+
+      generateBtn.addEventListener('click', function() {
+        const username = usernameInput.value.trim();
+        if (!username) {
+          usernameInput.focus();
+          return;
+        }
+        const md = `[![PR Collector](${baseURL}/card?username=${encodeURIComponent(username)}&style=default)](${baseURL}/pr?username=${encodeURIComponent(username)})`;
+        preview.innerHTML = `<img src="/card?username=${encodeURIComponent(username)}&style=default" alt="PR Collector Rank" style="max-width:100%">`;
+        markdownOutput.textContent = md;
+      });
+
+      // 复制
+      document.getElementById('copy-btn').addEventListener('click', function() {
+        navigator.clipboard.writeText(markdownOutput.textContent).then(function() {
+          showToast('已复制到剪贴板');
+        }).catch(function() {
+          showToast('复制失败');
+        });
+      });
+
+      function showToast(msg) {
+        const toast = document.getElementById('toast');
+        toast.textContent = msg;
+        toast.classList.add('show');
+        setTimeout(function() {
+          toast.classList.remove('show');
+        }, 2000);
+      }
+    })();
+  </script>
+</body>
+</html>

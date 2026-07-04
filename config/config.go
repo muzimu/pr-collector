@@ -38,10 +38,13 @@ type RedisConfig struct {
 
 // CronConfig 定时任务配置
 type CronConfig struct {
-	FullSync     string        `yaml:"full_sync"`
-	SVGCacheTTL  time.Duration `yaml:"svg_cache_ttl"`
-	FetchLockTTL time.Duration `yaml:"fetch_lock_ttl"`
-	MaxWorkers   int           `yaml:"max_workers"`
+	FullSync        string        `yaml:"full_sync"`
+	LeaderboardSync string        `yaml:"leaderboard_sync"`
+	SVGCacheTTL     time.Duration `yaml:"svg_cache_ttl"`
+	FetchLockTTL    time.Duration `yaml:"fetch_lock_ttl"`
+	MaxWorkers      int           `yaml:"max_workers"`
+	// LeaderboardMaxRaw 对数压缩公式中的 raw 上限，raw 等于该值时 score=100
+	LeaderboardMaxRaw int `yaml:"leaderboard_max_raw"`
 }
 
 // LogConfig 日志配置
@@ -92,6 +95,12 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Cron.FullSync == "" {
 		c.Cron.FullSync = "0 0 3 * * *"
+	}
+	if c.Cron.LeaderboardSync == "" {
+		c.Cron.LeaderboardSync = "0 0 4 * * *"
+	}
+	if c.Cron.LeaderboardMaxRaw == 0 {
+		c.Cron.LeaderboardMaxRaw = 100000
 	}
 	if c.Cron.SVGCacheTTL == 0 {
 		c.Cron.SVGCacheTTL = 24 * time.Hour

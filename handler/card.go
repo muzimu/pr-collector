@@ -46,8 +46,6 @@ func (h *CardHandler) Handle(c *gin.Context) {
 		return
 	}
 
-	h.log.Info().Str("username", username).Str("style", style).Int("top", topN).Str("client_ip", c.ClientIP()).Msg("[GET /card] request")
-
 	ctx := c.Request.Context()
 	h.store.IncrCardVisits(ctx, username)
 

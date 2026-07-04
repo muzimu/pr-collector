@@ -16,6 +16,8 @@ redis:
 
 cron:
   full_sync: "0 0 3 * * *"       # 全量同步 cron (秒 分 时 日 月 周), 默认凌晨3点
+  leaderboard_sync: "0 0 4 * * *" # 排行榜缓存刷新 cron, 默认凌晨4点
+  leaderboard_max_raw: 100000    # 对数压缩评分公式的 raw 上限
   svg_cache_ttl: 24h             # SVG 缓存过期时间
   fetch_lock_ttl: 60s            # 抓取分布式锁过期时间
   max_workers: 5                 # 批量同步最大并发协程数

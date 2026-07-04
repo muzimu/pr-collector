@@ -51,8 +51,6 @@ func (h *PRHandler) HandlePRPage(c *gin.Context) {
 		return
 	}
 
-	h.log.Info().Str("username", username).Str("client_ip", c.ClientIP()).Msg("[GET /pr] request")
-
 	ctx := c.Request.Context()
 	h.store.IncrPRVisits(ctx, username)
 
@@ -95,8 +93,6 @@ func (h *PRHandler) HandleRefresh(c *gin.Context) {
 		})
 		return
 	}
-
-	h.log.Info().Str("username", username).Str("client_ip", c.ClientIP()).Msg("[POST /refresh] request")
 
 	submitted := h.fetcher.SubmitFetch(username)
 	if submitted {

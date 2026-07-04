@@ -86,10 +86,21 @@ func main() {
 		log.Fatal().Err(err).Msg("renderer init failed")
 	}
 
+	// 排行榜评分服务
+	scoringService := svc.NewScoringService(store, cfg.Cron.LeaderboardMaxRaw, log)
+
+	// PR 数据成功抓取后，只增量更新该用户的排行榜分数
+	prProvider.OnFetched(func(_ context.Context, username string) {
+		log.Debug().Str("user", username).Msg("pr fetched, trigger leaderboard user score update")
+		scoringService.UpdateUserScoreAsync(username)
+	})
+
 	// ── 初始化 Cron ──────────────────────────────
 	scheduler := cron.NewScheduler(
 		cfg.Cron.FullSync,
+		cfg.Cron.LeaderboardSync,
 		fetcher,
+		scoringService,
 		cfg.Cron.MaxWorkers,
 		log,
 	)
@@ -98,6 +109,7 @@ func main() {
 	// ── 注册路由 ─────────────────────────────────
 	router := gin.New()
 	router.Use(gin.Recovery())
+	router.Use(middleware.RequestLogger(log))
 
 	// 限流中间件
 	cardLimiter := middleware.NewRateLimiter(cfg.RateLimit.CardRPS, log)
@@ -106,6 +118,7 @@ func main() {
 	// 处理器
 	cardHandler := handler.NewCardHandler(store, renderer, prProvider, cfg.Cron.SVGCacheTTL, log)
 	prHandler := handler.NewPRHandler(store, renderer, prProvider, fetcher, log)
+	leaderboardHandler := handler.NewLeaderboardHandler(store, scoringService, log)
 
 	// HTML 模板
 	router.SetHTMLTemplate(renderer.HTMLTemplate())
@@ -128,6 +141,16 @@ func main() {
 		usernameValidate,
 		prHandler.HandleRefresh,
 	)
+
+	router.POST("/refresh/leaderboard",
+		prLimiter.Handler(func(c *gin.Context) string { return c.ClientIP() }),
+		leaderboardHandler.HandleRefresh,
+	)
+
+	// 排行榜
+	router.GET("/", leaderboardHandler.HandleIndex)
+	router.GET("/api/leaderboard", leaderboardHandler.HandleLeaderboard)
+	router.GET("/api/leaderboard/stats", leaderboardHandler.HandleStats)
 
 	// 健康检查
 	router.GET("/health", func(c *gin.Context) {
