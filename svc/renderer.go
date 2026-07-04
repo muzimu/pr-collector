@@ -5,10 +5,11 @@ import (
 	"embed"
 	"fmt"
 	htmltemplate "html/template"
-	"sort"
-	texttemplate "text/template"
-
+	"math"
 	"pr-collector/github"
+	"sort"
+	"strconv"
+	texttemplate "text/template"
 )
 
 //go:embed tmpl/svg/*.svg
@@ -19,9 +20,14 @@ var htmlFS embed.FS
 
 // RepoInfo 单仓库摘要（用于 SVG 徽章展示 Top N）
 type RepoInfo struct {
-	Name    string
-	Stars   int
-	PRCount int
+	Name      string
+	Stars     int
+	StarsText string // 格式化后的 star 数量（如 1.2k）
+	StarsX    int    // star 文本在 chip 内的 x 坐标
+	PRCount   int
+	Width     int // chip 估算宽度
+	Offset    int // chip 在当前行中的 x 偏移
+	Row       int // chip 所在行号（从 0 开始，每行最多 3 个）
 }
 
 // SVGBadgeData SVG 模板渲染数据
@@ -30,6 +36,7 @@ type SVGBadgeData struct {
 	TotalPRs   int
 	TotalRepos int
 	TopRepos   []RepoInfo // 按 Stars 降序的 Top N 仓库，空则不展示仓库列表
+	Score      float64    // Trend Score
 	Height     int        // SVG 高度，根据 TopRepos 数量自动计算
 }
 
@@ -39,12 +46,65 @@ type Renderer struct {
 	htmlTemplates *htmltemplate.Template
 }
 
+// repoAgg 仓库聚合（用于 RenderSVG 内部分组统计）
+type repoAgg struct {
+	stars   int
+	prCount int
+}
+
+const badgeScoreMaxRaw = 100000.0
+
+// truncateName 截断过长的仓库名，避免单个 chip 超出卡片宽度
+func truncateName(name string, maxLen int) string {
+	if len(name) <= maxLen {
+		return name
+	}
+	if maxLen <= 3 {
+		return name[:maxLen]
+	}
+	return name[:maxLen-3] + "..."
+}
+
+// formatStars 将 star 数量格式化为紧凑可读字符串
+func formatStars(n int) string {
+	switch {
+	case n < 1000:
+		return strconv.Itoa(n)
+	case n < 10000:
+		return fmt.Sprintf("%.1fk", float64(n)/1000)
+	case n < 1000000:
+		return fmt.Sprintf("%.0fk", float64(n)/1000)
+	case n < 100000000:
+		return fmt.Sprintf("%.1fm", float64(n)/1000000)
+	default:
+		return fmt.Sprintf("%.0fm", float64(n)/1000000)
+	}
+}
+
+// calculateBadgeScore 根据仓库 star 分布计算 Trend Score（映射到 [50, 100]）
+func calculateBadgeScore(repoMap map[string]*repoAgg) float64 {
+	raw := 0.0
+	for _, ra := range repoMap {
+		raw += float64(ra.prCount) * math.Log2(float64(ra.stars)+1)
+	}
+	score := 50.0 + 50.0*math.Log10(raw+1)/math.Log10(badgeScoreMaxRaw+1)
+	if score > 100 {
+		score = 100
+	}
+	return score
+}
+
 // NewRenderer 加载并编译全部模板
 func NewRenderer() (*Renderer, error) {
 	// 自定义模板函数
 	funcMap := texttemplate.FuncMap{
 		"add": func(a, b int) int { return a + b },
+		"sub": func(a, b int) int { return a - b },
 		"mul": func(a, b int) int { return a * b },
+		"repoColor": func(i int) string {
+			colors := []string{"#ff6b6b", "#4ecdc4", "#45b7d1", "#96ceb4", "#ffeaa7", "#dfe6e9"}
+			return colors[i%len(colors)]
+		},
 	}
 
 	// 加载 SVG 模板
@@ -91,10 +151,6 @@ func (r *Renderer) RenderSVG(username, style string, prs []github.PRInfo, topN i
 	}
 
 	// 按仓库分组，统计 Stars 和 PR 数
-	type repoAgg struct {
-		stars   int
-		prCount int
-	}
 	repoMap := make(map[string]*repoAgg)
 	for _, pr := range prs {
 		ra, ok := repoMap[pr.Repo]
@@ -105,6 +161,9 @@ func (r *Renderer) RenderSVG(username, style string, prs []github.PRInfo, topN i
 		ra.prCount++
 	}
 	data.TotalRepos = len(repoMap)
+
+	// Trend Score：复用排行榜对数压缩公式，默认 raw 上限 100000
+	data.Score = calculateBadgeScore(repoMap)
 
 	// Top N：按 Stars 降序排列
 	if topN > 0 && len(repoMap) > 0 {
@@ -121,25 +180,52 @@ func (r *Renderer) RenderSVG(username, style string, prs []github.PRInfo, topN i
 			return sorted[i].stars > sorted[j].stars
 		})
 
-		limit := topN
-		if limit > len(sorted) {
-			limit = len(sorted)
-		}
-		data.TopRepos = make([]RepoInfo, limit)
-		for i := 0; i < limit; i++ {
-			data.TopRepos[i] = RepoInfo{
-				Name:    sorted[i].name,
-				Stars:   sorted[i].stars,
-				PRCount: sorted[i].count,
+		// 按 topN 展示仓库，根据 chip 宽度自动换行
+		const maxRowWidth = 660 // chip 行可用宽度上限（避开右侧 trend score 列）
+		chipLimit := min(topN, len(sorted))
+		data.TopRepos = make([]RepoInfo, chipLimit)
+		row := 0
+		offset := 0
+		for i := range chipLimit {
+			displayName := truncateName(sorted[i].name, 25)
+			nameWidth := int(float64(len(displayName)) * 7.5)
+			starsText := formatStars(sorted[i].stars)
+			// star 区域包含 "★ " 图标与数字，按 2 个额外字符估算宽度
+			starsWidth := int(float64(len(starsText)+2) * 7.5)
+			starsX := 22 + nameWidth + 8
+			width := starsX + starsWidth + 8
+
+			// 当前行放不下时换行（第一个 chip 除外）
+			if i > 0 && offset+width > maxRowWidth {
+				row++
+				offset = 0
 			}
+
+			data.TopRepos[i] = RepoInfo{
+				Name:      displayName,
+				Stars:     sorted[i].stars,
+				StarsText: starsText,
+				StarsX:    starsX,
+				PRCount:   sorted[i].count,
+				Width:     width,
+				Offset:    offset,
+				Row:       row,
+			}
+			offset += width + 8
 		}
 	}
 
-	// 自适应高度：基础 120px，每个仓库行 +22px
+	// 自适应高度：基础 158px，每多一行 chip +28px
 	if len(data.TopRepos) > 0 {
-		data.Height = 120 + len(data.TopRepos)*22
+		maxRow := 0
+		for _, r := range data.TopRepos {
+			if r.Row > maxRow {
+				maxRow = r.Row
+			}
+		}
+		data.Height = 158 + (maxRow+1)*28
 	} else {
-		data.Height = 120
+		data.Height = 158
 	}
 
 	tmpl, ok := r.svgTemplates[style]

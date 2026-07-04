@@ -644,7 +644,7 @@
         <a href="/" class="nav-item active">排行榜</a>
         <a href="#about" class="nav-item">关于</a>
       </nav>
-      <a href="#readme-card" class="btn btn-primary">在 Github README 中添加</a>
+      <a href="#readme-card" class="btn btn-primary">在 Github README 中添加卡片</a>
     </div>
   </header>
 
@@ -690,7 +690,7 @@
               </div>
               <div class="col-user">
                 <a href="https://github.com/{{.Username}}" target="_blank" rel="noopener">
-                  <img class="avatar" src="https://avatars.githubusercontent.com/{{.Username}}" alt="{{.Username}}" onerror="this.style.display='none'">
+                  <img class="avatar" src="https://avatars.githubusercontent.com/u/{{.AuthorID}}?v=4" alt="{{.Username}}" onerror="this.style.display='none'">
                   <span class="username">@{{.Username}}</span>
                 </a>
               </div>
@@ -732,7 +732,7 @@
         </div>
 
         <div class="card" id="readme-card">
-          <h3>在 Github README 中添加</h3>
+          <h3>在 Github README 中添加卡片</h3>
           <p class="desc">生成你的 PR 贡献者排名卡片，一键嵌入到 GitHub README 中展示。</p>
           <input type="text" id="card-username" placeholder="输入 GitHub 用户名">
           <button id="generate-card-btn" class="btn btn-primary btn-block">生成卡片</button>
@@ -743,7 +743,7 @@
             <span class="code-label">Markdown 代码</span>
             <button id="copy-btn" class="btn btn-sm">📋 一键复制</button>
           </div>
-          <pre class="code-block"><code id="markdown-output">[![PR Collector]({{.BaseURL}}/card?username=YOUR_USERNAME&style=default)]({{.BaseURL}}/pr?username=YOUR_USERNAME)</code></pre>
+          <pre class="code-block"><code id="markdown-output">[![PR Collector]({{.BaseURL}}/card?username=YOUR_USERNAME&top=3&style=default)]({{.BaseURL}}/pr?username=YOUR_USERNAME)</code></pre>
         </div>
       </aside>
     </div>
@@ -796,7 +796,7 @@
             <div class="col-rank">${medal}</div>
             <div class="col-user">
               <a href="https://github.com/${escapeHtml(u.username)}" target="_blank" rel="noopener">
-                <img class="avatar" src="https://avatars.githubusercontent.com/${escapeHtml(u.username)}" alt="${escapeHtml(u.username)}" onerror="this.style.display='none'">
+                <img class="avatar" src="https://avatars.githubusercontent.com/u/${u.author_id || 0}?v=4" alt="${escapeHtml(u.username)}" onerror="this.style.display='none'">
                 <span class="username">@${escapeHtml(u.username)}</span>
               </a>
             </div>
@@ -863,8 +863,8 @@
           usernameInput.focus();
           return;
         }
-        const md = `[![PR Collector](${baseURL}/card?username=${encodeURIComponent(username)}&style=default)](${baseURL}/pr?username=${encodeURIComponent(username)})`;
-        preview.innerHTML = `<img src="/card?username=${encodeURIComponent(username)}&style=default" alt="PR Collector Rank" style="max-width:100%">`;
+        const md = `[![PR Collector](${baseURL}/card?username=${encodeURIComponent(username)}&top=3&style=default)](${baseURL}/pr?username=${encodeURIComponent(username)})`;
+        preview.innerHTML = `<img src="/card?username=${encodeURIComponent(username)}&top=3&style=default" alt="PR Collector Rank" style="max-width:100%">`;
         markdownOutput.textContent = md;
       });
 
