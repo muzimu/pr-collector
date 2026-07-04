@@ -126,9 +126,11 @@ func NewRenderer() (*Renderer, error) {
 		svgTemplates[style] = tmpl
 	}
 
-	// 加载 HTML 模板（带自定义函数 add）
+	// 加载 HTML 模板（带自定义函数 add、sub、formatStars）
 	htmlFuncMap := htmltemplate.FuncMap{
-		"add": func(a, b int) int { return a + b },
+		"add":         func(a, b int) int { return a + b },
+		"sub":         func(a, b int) int { return a - b },
+		"formatStars": formatStars,
 	}
 	htmlTemplates, err := htmltemplate.New("").Funcs(htmlFuncMap).ParseFS(htmlFS, "tmpl/html/*.html")
 	if err != nil {
