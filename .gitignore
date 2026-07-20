@@ -2,6 +2,9 @@
 pr-collector
 *.exe
 
+# GoReleaser 构建产物
+dist/
+
 # 配置（包含敏感 token）
 config.yaml
 

@@ -194,6 +194,26 @@ GET /health → {"status": "ok"}
 
 ## 部署
 
+### GoReleaser 构建与发布
+
+本项目使用 GoReleaser 生成 Linux、macOS、Windows 的 amd64/arm64 二进制归档。每个归档包含 `config.example.yaml`，发布产物和 `checksums.txt` 会自动上传到 GitHub Release。
+
+本地验证全部目标：
+
+```bash
+goreleaser check
+goreleaser build --snapshot --clean
+```
+
+创建版本 tag 并推送后，GitHub Actions 会自动发布：
+
+```bash
+git tag -a v0.1.0 -m "First release"
+git push origin v0.1.0
+```
+
+PR 只执行 snapshot 构建验证，不会创建 GitHub Release。
+
 ### 一键脚本
 
 ```bash

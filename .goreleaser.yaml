@@ -1,0 +1,58 @@
+version: 2
+
+project_name: pr-collector
+
+before:
+  hooks:
+    - go test ./...
+
+builds:
+  - id: pr-collector
+    main: .
+    binary: pr-collector
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+
+archives:
+  - id: pr-collector
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    files:
+      - config.example.yaml
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - '^ci:'
+
+release:
+  github:
+    owner: muzimu
+    name: pr-collector
+  draft: false
+  prerelease: auto
