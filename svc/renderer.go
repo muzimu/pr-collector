@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	htmltemplate "html/template"
+	"io/fs"
 	"math"
 	"pr-collector/github"
 	"sort"
@@ -17,6 +18,9 @@ var svgFS embed.FS
 
 //go:embed tmpl/html/*.html
 var htmlFS embed.FS
+
+//go:embed static/*
+var embeddedStaticFS embed.FS
 
 // RepoInfo 单仓库摘要（用于 SVG 徽章展示 Top N）
 type RepoInfo struct {
@@ -44,6 +48,7 @@ type SVGBadgeData struct {
 type Renderer struct {
 	svgTemplates  map[string]*texttemplate.Template
 	htmlTemplates *htmltemplate.Template
+	staticFiles   fs.FS
 }
 
 // repoAgg 仓库聚合（用于 RenderSVG 内部分组统计）
@@ -136,10 +141,15 @@ func NewRenderer() (*Renderer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse html templates: %w", err)
 	}
+	staticFiles, err := fs.Sub(embeddedStaticFS, "static")
+	if err != nil {
+		return nil, fmt.Errorf("open embedded static files: %w", err)
+	}
 
 	return &Renderer{
 		svgTemplates:  svgTemplates,
 		htmlTemplates: htmlTemplates,
+		staticFiles:   staticFiles,
 	}, nil
 }
 
@@ -268,6 +278,11 @@ func (r *Renderer) RenderError(reason string) string {
 // HTMLTemplate 返回编译好的 HTML 模板实例
 func (r *Renderer) HTMLTemplate() *htmltemplate.Template {
 	return r.htmlTemplates
+}
+
+// StaticFS returns versioned frontend assets embedded in the application.
+func (r *Renderer) StaticFS() fs.FS {
+	return r.staticFiles
 }
 
 func placeholderText(state string) string {

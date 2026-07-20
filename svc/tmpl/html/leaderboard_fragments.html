@@ -1,0 +1,76 @@
+{{define "leaderboard_stats"}}
+<div class="stats-row" id="leaderboard-stats">
+  <div class="stat-card">
+    <div class="stat-icon">👥</div>
+    <div class="stat-value" data-target="{{.Stats.TotalUsers}}">{{.Stats.TotalUsers}}</div>
+    <div class="stat-label">开发者</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">📦</div>
+    <div class="stat-value" data-target="{{.Stats.TotalPRs}}">{{.Stats.TotalPRs}}</div>
+    <div class="stat-label">Pull Requests</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">⭐</div>
+    <div class="stat-value" data-target="{{.Stats.TotalRepos}}">{{.Stats.TotalRepos}}</div>
+    <div class="stat-label">仓库</div>
+  </div>
+</div>
+{{end}}
+
+{{define "leaderboard_rows"}}
+{{range .Users}}
+<div class="table-row rank-{{if le .Rank 3}}{{.Rank}}{{end}}" data-username="{{.Username}}">
+  <div class="col-rank">
+    {{if eq .Rank 1}}🥇{{else if eq .Rank 2}}🥈{{else if eq .Rank 3}}🥉{{else}}{{.Rank}}{{end}}
+  </div>
+  <div class="col-user">
+    <a href="https://github.com/{{.Username}}" target="_blank" rel="noopener">
+      <img class="avatar" src="https://avatars.githubusercontent.com/{{.Username}}" alt="{{.Username}}" onerror="this.style.display='none'">
+      <span class="username">@{{.Username}}</span>
+    </a>
+  </div>
+  <div class="col-score">
+    <span class="score-value {{if ge .Score 90.0}}score-high{{else}}score-normal{{end}}">{{.Score}}</span>
+    <div class="score-bar">
+      <div class="score-bar-fill" style="width: {{.Score}}%"></div>
+    </div>
+  </div>
+  <div class="col-pr">{{.PRCount}}</div>
+  <div class="col-repos">{{.RepoCount}}</div>
+  <div class="col-arrow">
+    <a href="/pr?username={{.Username}}" class="arrow">→</a>
+  </div>
+</div>
+{{end}}
+{{if and (eq (len .Users) 0) (eq .Offset 0)}}
+<div class="empty-state">当前榜单为空</div>
+{{end}}
+{{end}}
+
+{{define "leaderboard_pagination_content"}}
+{{if .HasMore}}
+<a
+  href="/api/leaderboard?limit={{.Limit}}&offset={{.NextOffset}}"
+  class="btn btn-outline"
+  hx-get="/api/leaderboard?limit={{.Limit}}&offset={{.NextOffset}}"
+  hx-target="#leaderboard-body"
+  hx-swap="beforeend"
+  hx-indicator="#leaderboard-loading"
+>加载更多</a>
+<span id="leaderboard-loading" class="htmx-indicator" role="status">加载中...</span>
+{{end}}
+{{end}}
+
+{{define "leaderboard_pagination"}}
+<div class="load-more" id="leaderboard-pagination">
+  {{template "leaderboard_pagination_content" .}}
+</div>
+{{end}}
+
+{{define "leaderboard_page"}}
+{{template "leaderboard_rows" .}}
+<div class="load-more" id="leaderboard-pagination" hx-swap-oob="outerHTML">
+  {{template "leaderboard_pagination_content" .}}
+</div>
+{{end}}

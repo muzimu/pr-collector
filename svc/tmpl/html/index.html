@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  {{template "htmx_head" .}}
   <style>
     :root {
       --bg: #ffffff;
@@ -65,6 +66,7 @@
       font-size: 18px;
       font-weight: 700;
       color: var(--text-primary);
+      white-space: nowrap;
     }
 
     .nav {
@@ -168,6 +170,7 @@
       color: var(--accent);
       margin-bottom: 12px;
       letter-spacing: -0.02em;
+      text-wrap: balance;
     }
 
     .subtitle {
@@ -375,7 +378,25 @@
     .load-more {
       display: flex;
       justify-content: center;
+      align-items: center;
+      gap: 12px;
       margin-top: 20px;
+    }
+
+    .htmx-indicator { display: none; }
+    .htmx-request.htmx-indicator { display: inline; }
+    .htmx-request.btn { opacity: 0.65; pointer-events: none; }
+
+    .notice {
+      margin: -24px auto 32px;
+      max-width: 720px;
+      padding: 10px 16px;
+      border: 1px solid #bbf7d0;
+      border-radius: 8px;
+      background: #f0fdf4;
+      color: #15803d;
+      font-size: 14px;
+      text-align: center;
     }
 
     .empty-state {
@@ -567,6 +588,10 @@
         flex-direction: column;
       }
 
+      .leaderboard {
+        width: 100%;
+      }
+
       .sidebar {
         width: 100%;
       }
@@ -596,6 +621,12 @@
 
       .header-inner {
         padding: 0 16px;
+      }
+
+      .header .btn-primary {
+        padding: 8px 10px;
+        font-size: 12px;
+        white-space: nowrap;
       }
 
       .nav {
@@ -652,24 +683,10 @@
     <section class="hero">
       <h1>GitHub PR 贡献者排行榜</h1>
       <p class="subtitle">基于 PR 数量与仓库 Star 的综合评分</p>
-      <div class="stats-row">
-        <div class="stat-card">
-          <div class="stat-icon">👥</div>
-          <div class="stat-value" data-target="{{.Stats.TotalUsers}}">0</div>
-          <div class="stat-label">开发者</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">📦</div>
-          <div class="stat-value" data-target="{{.Stats.TotalPRs}}">0</div>
-          <div class="stat-label">Pull Requests</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">⭐</div>
-          <div class="stat-value" data-target="{{.Stats.TotalRepos}}">0</div>
-          <div class="stat-label">仓库</div>
-        </div>
-      </div>
+      {{template "leaderboard_stats" .}}
     </section>
+
+    {{if .Notice}}<div class="notice" role="status">{{.Notice}}</div>{{end}}
 
     <div class="main-grid">
       <section class="leaderboard">
@@ -683,38 +700,10 @@
             <div class="col-arrow"></div>
           </div>
           <div id="leaderboard-body">
-            {{range .Users}}
-            <div class="table-row rank-{{if le .Rank 3}}{{.Rank}}{{end}}" data-username="{{.Username}}">
-              <div class="col-rank">
-                {{if eq .Rank 1}}🥇{{else if eq .Rank 2}}🥈{{else if eq .Rank 3}}🥉{{else}}{{.Rank}}{{end}}
-              </div>
-              <div class="col-user">
-                <a href="https://github.com/{{.Username}}" target="_blank" rel="noopener">
-                  <img class="avatar" src="https://avatars.githubusercontent.com/{{.Username}}" alt="{{.Username}}" onerror="this.style.display='none'">
-                  <span class="username">@{{.Username}}</span>
-                </a>
-              </div>
-              <div class="col-score">
-                <span class="score-value {{if ge .Score 90.0}}score-high{{else}}score-normal{{end}}">{{.Score}}</span>
-                <div class="score-bar">
-                  <div class="score-bar-fill" style="width: {{.Score}}%"></div>
-                </div>
-              </div>
-              <div class="col-pr">{{.PRCount}}</div>
-              <div class="col-repos">{{.RepoCount}}</div>
-              <div class="col-arrow">
-                <a href="/pr?username={{.Username}}" class="arrow">→</a>
-              </div>
-            </div>
-            {{end}}
-            {{if eq (len .Users) 0}}
-            <div class="empty-state">当前榜单为空</div>
-            {{end}}
+            {{template "leaderboard_rows" .}}
           </div>
         </div>
-        <div class="load-more">
-          <button id="load-more-btn" class="btn btn-outline">加载更多</button>
-        </div>
+        {{template "leaderboard_pagination" .}}
       </section>
 
       <aside class="sidebar">
@@ -734,16 +723,19 @@
         <div class="card" id="readme-card">
           <h3>在 Github README 中添加卡片</h3>
           <p class="desc">生成你的 PR 贡献者排名卡片，一键嵌入到 GitHub README 中展示。</p>
-          <input type="text" id="card-username" placeholder="输入 GitHub 用户名">
-          <button id="generate-card-btn" class="btn btn-primary btn-block">生成卡片</button>
-          <div id="card-preview" class="preview-card">
-            <span class="preview-placeholder">预览将在此显示</span>
-          </div>
-          <div class="code-header">
-            <span class="code-label">Markdown 代码</span>
-            <button id="copy-btn" class="btn btn-sm">📋 一键复制</button>
-          </div>
-          <pre class="code-block"><code id="markdown-output">[![PR Collector]({{.BaseURL}}/card?username=YOUR_USERNAME&top=3&style=default)]({{.BaseURL}}/pr?username=YOUR_USERNAME)</code></pre>
+          <form
+            action="/card/preview"
+            method="get"
+            hx-get="/card/preview"
+            hx-target="#card-preview-result"
+            hx-swap="outerHTML"
+            hx-indicator="#card-preview-loading"
+          >
+            <input type="text" id="card-username" name="username" value="{{.CardUsername}}" placeholder="输入 GitHub 用户名" maxlength="39" required>
+            <button id="generate-card-btn" type="submit" class="btn btn-primary btn-block">生成卡片</button>
+            <span id="card-preview-loading" class="htmx-indicator" role="status">正在生成...</span>
+          </form>
+          {{template "card_preview" .}}
         </div>
       </aside>
     </div>
@@ -756,18 +748,8 @@
 
   <div id="toast" class="toast">已复制到剪贴板</div>
 
-  <script id="initial-data" type="application/json">
-    {{.InitialData}}
-  </script>
-
   <script>
     (function() {
-      const initialData = JSON.parse(document.getElementById('initial-data').textContent || '{}');
-      let users = initialData.users || [];
-      let total = initialData.total || 0;
-      let offset = users.length;
-      const baseURL = (initialData.baseURL || window.location.origin || '').replace(/\/$/, '');
-
       // 数字滚动动画
       function animateValue(el) {
         const target = parseInt(el.dataset.target, 10) || 0;
@@ -775,6 +757,7 @@
           el.textContent = '0';
           return;
         }
+        el.textContent = '0';
         const duration = 1500;
         const start = performance.now();
         function step(now) {
@@ -786,95 +769,27 @@
       }
       document.querySelectorAll('.stat-value').forEach(animateValue);
 
-      // 渲染单行
-      function renderRow(u, rank) {
-        const medal = rank <= 3 ? ['🥇','🥈','🥉'][rank-1] : rank;
-        const scoreClass = u.score >= 90 ? 'score-high' : 'score-normal';
-        const rankClass = rank <= 3 ? 'rank-' + rank : '';
-        return `
-          <div class="table-row ${rankClass}" data-username="${escapeHtml(u.username)}">
-            <div class="col-rank">${medal}</div>
-            <div class="col-user">
-              <a href="https://github.com/${escapeHtml(u.username)}" target="_blank" rel="noopener">
-                <img class="avatar" src="https://avatars.githubusercontent.com/${escapeHtml(u.username)}" alt="${escapeHtml(u.username)}" onerror="this.style.display='none'">
-                <span class="username">@${escapeHtml(u.username)}</span>
-              </a>
-            </div>
-            <div class="col-score">
-              <span class="score-value ${scoreClass}">${u.score}</span>
-              <div class="score-bar"><div class="score-bar-fill" style="width:${u.score}%"></div></div>
-            </div>
-            <div class="col-pr">${u.pr_count}</div>
-            <div class="col-repos">${u.repo_count}</div>
-            <div class="col-arrow"><a href="/pr?username=${escapeHtml(u.username)}" class="arrow">→</a></div>
-          </div>
-        `;
-      }
-
-      function escapeHtml(str) {
-        if (!str) return '';
-        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-      }
-
-      // 加载更多
-      const loadMoreBtn = document.getElementById('load-more-btn');
-      if (offset >= total) {
-        loadMoreBtn.style.display = 'none';
-      }
-
-      loadMoreBtn.addEventListener('click', async function() {
-        if (offset >= total) return;
-        loadMoreBtn.disabled = true;
-        loadMoreBtn.textContent = '加载中...';
-        try {
-          const res = await fetch(`/api/leaderboard?limit=50&offset=${offset}`);
-          if (!res.ok) throw new Error('load failed');
-          const data = await res.json();
-          const tbody = document.getElementById('leaderboard-body');
-          const fragment = document.createElement('div');
-          data.users.forEach(function(u, idx) {
-            fragment.innerHTML += renderRow(u, offset + idx + 1);
-          });
-          while (fragment.firstChild) {
-            tbody.appendChild(fragment.firstChild);
-          }
-          offset += data.users.length;
-          total = data.total;
-          if (offset >= total) {
-            loadMoreBtn.style.display = 'none';
-          }
-        } catch (e) {
-          showToast('加载失败，请稍后重试');
-        } finally {
-          loadMoreBtn.disabled = false;
-          loadMoreBtn.textContent = '加载更多';
-        }
-      });
-
-      // 生成卡片
-      const generateBtn = document.getElementById('generate-card-btn');
-      const usernameInput = document.getElementById('card-username');
-      const preview = document.getElementById('card-preview');
-      const markdownOutput = document.getElementById('markdown-output');
-
-      generateBtn.addEventListener('click', function() {
-        const username = usernameInput.value.trim();
-        if (!username) {
-          usernameInput.focus();
-          return;
-        }
-        const md = `[![PR Collector](${baseURL}/card?username=${encodeURIComponent(username)}&top=3&style=default)](${baseURL}/pr?username=${encodeURIComponent(username)})`;
-        preview.innerHTML = `<img src="/card?username=${encodeURIComponent(username)}&top=3&style=default" alt="PR Collector Rank" style="max-width:100%">`;
-        markdownOutput.textContent = md;
-      });
-
       // 复制
-      document.getElementById('copy-btn').addEventListener('click', function() {
+      document.addEventListener('click', function(event) {
+        if (!event.target.closest('#copy-btn')) return;
+        const markdownOutput = document.getElementById('markdown-output');
         navigator.clipboard.writeText(markdownOutput.textContent).then(function() {
           showToast('已复制到剪贴板');
         }).catch(function() {
           showToast('复制失败');
         });
+      });
+
+      document.addEventListener('htmx:afterSwap', function(event) {
+        event.detail.target.querySelectorAll('.stat-value').forEach(animateValue);
+      });
+
+      document.addEventListener('htmx:sendError', function() {
+        showToast('请求失败，请检查网络后重试');
+      });
+
+      document.addEventListener('htmx:timeout', function() {
+        showToast('请求超时，请稍后重试');
       });
 
       function showToast(msg) {

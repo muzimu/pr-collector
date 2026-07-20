@@ -7,183 +7,36 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #ffffff;
-      --text-primary: #1e293b;
-      --text-secondary: #52525b;
-      --text-tertiary: #71717b;
-      --accent: #ea580c;
-      --accent-hover: #c2410c;
-      --error: #dc2626;
-      --border: #e2e8f0;
-      --bg-secondary: #f6f8fb;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      font-family: "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text-primary);
-      line-height: 1.5;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-
-    a { text-decoration: none; color: inherit; }
-
-    .header {
-      height: 64px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .header-inner {
-      max-width: 1200px;
-      margin: 0 auto;
-      height: 100%;
-      padding: 0 24px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .logo {
-      font-size: 18px;
-      font-weight: 700;
-      color: var(--text-primary);
-    }
-
-    .nav-item {
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--text-secondary);
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border: none;
-      border-radius: 8px;
-      font-family: inherit;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-
-    .btn-primary {
-      background: var(--accent);
-      color: #fff;
-      padding: 10px 20px;
-    }
-
-    .btn-primary:hover {
-      background: var(--accent-hover);
-    }
-
-    .btn-outline {
-      background: #fff;
-      color: var(--text-primary);
-      border: 1px solid var(--border);
-      padding: 10px 20px;
-    }
-
-    .btn-outline:hover {
-      background: var(--bg-secondary);
-    }
-
-    .main {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 48px 24px;
-    }
-
-    .card {
-      background: #fff;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 48px;
-      text-align: center;
-      max-width: 520px;
-      width: 100%;
-    }
-
-    .icon {
-      font-size: 56px;
-      line-height: 1;
-      margin-bottom: 16px;
-    }
-
-    .card h1 {
-      font-size: 22px;
-      font-weight: 700;
-      color: var(--text-primary);
-      margin-bottom: 12px;
-    }
-
-    .error-message {
-      display: inline-block;
-      background: #fef2f2;
-      color: var(--error);
-      font-size: 14px;
-      padding: 10px 16px;
-      border-radius: 8px;
-      margin-bottom: 24px;
-      word-break: break-word;
-    }
-
-    .card p {
-      font-size: 15px;
-      color: var(--text-secondary);
-      margin-bottom: 24px;
-    }
-
-    .actions {
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-
-    @media (max-width: 640px) {
-      .card {
-        padding: 36px 24px;
-      }
-
-      .actions {
-        flex-direction: column;
-      }
-
-      .actions .btn {
-        width: 100%;
-      }
-    }
-  </style>
+  {{template "htmx_head" .}}
 </head>
-<body>
-  <header class="header">
-    <div class="header-inner">
-      <a href="/" class="logo">🏆 PR Collector</a>
-      <a href="/" class="nav-item">排行榜</a>
-    </div>
-  </header>
-
-  <main class="main">
-    <div class="card">
-      <div class="icon">⚠️</div>
-      <h1>页面出错了</h1>
-      <div class="error-message">{{.message}}</div>
-      <p>请稍后重试，或返回排行榜查看其他内容</p>
-      <div class="actions">
-        <a href="/" class="btn btn-primary">返回排行榜</a>
-        <button onclick="history.back()" class="btn btn-outline">返回上一页</button>
-      </div>
-    </div>
-  </main>
+<body class="feedback-document">
+  {{template "error_content" .}}
 </body>
 </html>
+
+{{define "error_content"}}
+<header class="feedback-page-header">
+  <div class="feedback-page-header-inner">
+    <a href="/" class="feedback-page-logo">🏆 PR Collector</a>
+    <a href="/" class="feedback-page-nav">排行榜</a>
+  </div>
+</header>
+
+<main class="feedback-page-main">
+  <div class="feedback-card">
+    <div class="feedback-icon">⚠️</div>
+    <h1>页面出错了</h1>
+    <div class="feedback-error-message">{{.message}}</div>
+    <p>请稍后重试，或返回排行榜查看其他内容</p>
+    <div class="feedback-actions">
+      <a href="/" class="feedback-button feedback-button-primary">返回排行榜</a>
+      <button type="button" onclick="history.back()" class="feedback-button feedback-button-outline">返回上一页</button>
+    </div>
+  </div>
+</main>
+{{end}}
+
+{{define "error_fragment"}}
+<title>出错了 - PR Collector</title>
+{{template "error_content" .}}
+{{end}}

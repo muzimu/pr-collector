@@ -36,6 +36,16 @@ func NewRateLimiter(rps int, log zerolog.Logger) *RateLimiter {
 
 // Handler 返回 Gin 中间件处理函数
 func (rl *RateLimiter) Handler(keyFunc func(*gin.Context) string) gin.HandlerFunc {
+	return rl.HandlerWithResponder(keyFunc, func(c *gin.Context) {
+		c.JSON(http.StatusTooManyRequests, gin.H{
+			"error": "rate limit exceeded",
+		})
+	})
+}
+
+// HandlerWithResponder returns rate limiting middleware with a caller-defined
+// response for rejected requests.
+func (rl *RateLimiter) HandlerWithResponder(keyFunc func(*gin.Context) string, onLimit gin.HandlerFunc) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		key := keyFunc(c)
 
@@ -58,11 +68,10 @@ func (rl *RateLimiter) Handler(keyFunc func(*gin.Context) string) gin.HandlerFun
 		bucket.lastTime = now
 
 		if bucket.tokens < 1 {
-			rl.log.Warn().Str("key", key).Msg("rate limited")
-			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
-				"error": "rate limit exceeded",
-			})
 			rl.mu.Unlock()
+			rl.log.Warn().Str("key", key).Msg("rate limited")
+			c.Abort()
+			onLimit(c)
 			return
 		}
 

@@ -1,0 +1,17 @@
+{{define "htmx_head"}}
+  <link rel="stylesheet" href="/static/feedback.css">
+  <meta name="htmx-config" content='{
+    "historyCacheSize": 0,
+    "historyRestoreAsHxRequest": false,
+    "disableInheritance": true,
+    "includeIndicatorStyles": false,
+    "responseHandling": [
+      {"code": "204", "swap": false},
+      {"code": "422", "swap": true},
+      {"code": "[45]..", "swap": true, "target": "body", "error": true},
+      {"code": "...", "swap": true}
+    ],
+    "timeout": 30000
+  }'>
+  <script defer src="/static/htmx-2.0.10.min.js"></script>
+{{end}}

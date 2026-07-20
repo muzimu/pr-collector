@@ -108,12 +108,15 @@ func main() {
 
 	// ── 注册路由 ─────────────────────────────────
 	router := gin.New()
-	router.Use(gin.Recovery())
+	router.Use(gin.CustomRecovery(recoverRequest))
 	router.Use(middleware.RequestLogger(log))
 
 	// 限流中间件
 	cardLimiter := middleware.NewRateLimiter(cfg.RateLimit.CardRPS, log)
 	prLimiter := middleware.NewRateLimiter(cfg.RateLimit.PRRPS, log)
+	htmlRateLimitResponder := func(c *gin.Context) {
+		handler.RenderPageError(c, http.StatusTooManyRequests, "请求过于频繁，请稍后重试")
+	}
 
 	// 处理器
 	cardHandler := handler.NewCardHandler(store, renderer, prProvider, cfg.Cron.SVGCacheTTL, log)
@@ -122,6 +125,7 @@ func main() {
 
 	// HTML 模板
 	router.SetHTMLTemplate(renderer.HTMLTemplate())
+	router.StaticFS("/static", http.FS(renderer.StaticFS()))
 
 	// 路由
 	router.GET("/card",
@@ -131,21 +135,23 @@ func main() {
 	)
 
 	prGroup := router.Group("/pr")
-	prGroup.Use(prLimiter.Handler(func(c *gin.Context) string { return c.ClientIP() }))
+	prGroup.Use(prLimiter.HandlerWithResponder(func(c *gin.Context) string { return c.ClientIP() }, htmlRateLimitResponder))
 	prGroup.Use(usernameValidate)
 	{
 		prGroup.GET("", prHandler.HandlePRPage)
 	}
 	router.POST("/refresh",
-		prLimiter.Handler(func(c *gin.Context) string { return c.ClientIP() }),
+		prLimiter.HandlerWithResponder(func(c *gin.Context) string { return c.ClientIP() }, htmlRateLimitResponder),
 		usernameValidate,
 		prHandler.HandleRefresh,
 	)
+	router.GET("/refresh/status", usernameValidate, prHandler.HandleRefreshStatus)
 
 	router.POST("/refresh/leaderboard",
-		prLimiter.Handler(func(c *gin.Context) string { return c.ClientIP() }),
+		prLimiter.HandlerWithResponder(func(c *gin.Context) string { return c.ClientIP() }, htmlRateLimitResponder),
 		leaderboardHandler.HandleRefresh,
 	)
+	router.GET("/card/preview", usernameValidate, leaderboardHandler.HandleCardPreview)
 
 	// 排行榜
 	router.GET("/", leaderboardHandler.HandleIndex)
@@ -208,12 +214,24 @@ func usernameValidate(c *gin.Context) {
 	if !githubUsernameRE.MatchString(username) ||
 		strings.HasSuffix(username, "-") ||
 		strings.Contains(username, "--") {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
-			"error": "invalid github username",
-		})
+		c.Abort()
+		if c.Request.URL.Path == "/card" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid github username"})
+		} else {
+			handler.RenderPageError(c, http.StatusBadRequest, "GitHub 用户名格式无效")
+		}
 		return
 	}
 	c.Next()
+}
+
+func recoverRequest(c *gin.Context, _ any) {
+	c.Abort()
+	if c.Request.URL.Path == "/card" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	handler.RenderPageError(c, http.StatusInternalServerError, "服务器内部错误，请稍后重试")
 }
 
 // initLogger 初始化 zerolog：同时输出文件和控制台

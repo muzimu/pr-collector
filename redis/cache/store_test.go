@@ -15,6 +15,10 @@ import (
 // TestClearAllProjectKeys 本地调试用：清空本项目在 Redis 中的所有 key。
 // ⚠️ 危险操作：会不可逆删除所有业务数据，仅用于本地测试。
 func TestClearAllProjectKeys(t *testing.T) {
+	if os.Getenv("PR_COLLECTOR_CLEAR_TEST_DATA") != "1" {
+		t.Skip("set PR_COLLECTOR_CLEAR_TEST_DATA=1 to clear project Redis keys")
+	}
+
 	cfg := &config.Config{
 		Redis: config.RedisConfig{
 			Addr: "127.0.0.1:6379",
