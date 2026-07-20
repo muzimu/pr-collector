@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{.Title}} - PR Collector</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  {{template "htmx_head" .}}
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text-primary: #1e293b;
+      --text-secondary: #52525b;
+      --accent: #ea580c;
+      --accent-hover: #c2410c;
+      --green: #15803d;
+      --error: #dc2626;
+      --border: #e2e8f0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text-primary);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    a { text-decoration: none; color: inherit; }
+    .header { height: 64px; border-bottom: 1px solid var(--border); }
+
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      height: 100%;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo { font-size: 18px; font-weight: 700; }
+    .nav-item { font-size: 14px; font-weight: 500; color: var(--text-secondary); }
+
+    .main {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 24px;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 48px;
+      text-align: center;
+      max-width: 520px;
+      width: 100%;
+    }
+
+    .icon { font-size: 56px; line-height: 1; margin-bottom: 16px; }
+    .card h1 { font-size: 22px; font-weight: 700; margin-bottom: 12px; }
+
+    .message {
+      display: inline-block;
+      font-size: 14px;
+      padding: 10px 16px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+    }
+
+    .message.success { background: #f0fdf4; color: var(--green); }
+    .message.error { background: #fef2f2; color: var(--error); }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      border-radius: 8px;
+      background: var(--accent);
+      color: #fff;
+      padding: 10px 20px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.2s ease;
+    }
+
+    .btn:hover { background: var(--accent-hover); }
+
+    @media (max-width: 640px) {
+      .card { padding: 36px 24px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <a href="/" class="logo">🏆 PR Collector</a>
+      <a href="/" class="nav-item">排行榜</a>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="card">
+      <div class="icon">{{if .Success}}✅{{else}}⚠️{{end}}</div>
+      <h1>{{.Title}}</h1>
+      <div class="message {{if .Success}}success{{else}}error{{end}}">{{.Message}}</div>
+      <div><a href="{{.ReturnURL}}" class="btn">返回</a></div>
+    </div>
+  </main>
+</body>
+</html>

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"net/url"
 	"sort"
 
 	"github.com/gin-gonic/gin"
@@ -12,12 +13,16 @@ import (
 	"pr-collector/svc"
 )
 
+type fetchSubmitter interface {
+	SubmitFetch(username string) bool
+}
+
 // RepoGroup 按仓库聚合的 PR 展示结构
 type RepoGroup struct {
-	Repo     string
-	RepoURL  string
-	Stars    int
-	PRs      []github.PRInfo
+	Repo    string
+	RepoURL string
+	Stars   int
+	PRs     []github.PRInfo
 }
 
 // PRHandler GET /pr + POST /refresh 处理器 — PR 详情页
@@ -25,12 +30,12 @@ type PRHandler struct {
 	store    *cache.Store
 	renderer *svc.Renderer
 	provider *svc.PRProvider
-	fetcher  *svc.Fetcher
+	fetcher  fetchSubmitter
 	log      zerolog.Logger
 }
 
 // NewPRHandler 创建 PR 页面处理器
-func NewPRHandler(store *cache.Store, renderer *svc.Renderer, provider *svc.PRProvider, fetcher *svc.Fetcher, log zerolog.Logger) *PRHandler {
+func NewPRHandler(store *cache.Store, renderer *svc.Renderer, provider *svc.PRProvider, fetcher fetchSubmitter, log zerolog.Logger) *PRHandler {
 	return &PRHandler{
 		store:    store,
 		renderer: renderer,
@@ -45,9 +50,7 @@ func (h *PRHandler) HandlePRPage(c *gin.Context) {
 	username := c.Query("username")
 	if username == "" {
 		h.log.Warn().Str("client_ip", c.ClientIP()).Msg("[GET /pr] missing username")
-		c.HTML(http.StatusOK, "error.html", gin.H{
-			"message": "缺少 username 参数",
-		})
+		RenderPageError(c, http.StatusOK, "缺少 username 参数")
 		return
 	}
 
@@ -58,9 +61,7 @@ func (h *PRHandler) HandlePRPage(c *gin.Context) {
 	prs, err := h.provider.GetOrFetch(ctx, username)
 	if err != nil {
 		h.log.Error().Err(err).Str("username", username).Msg("[GET /pr] fetch failed")
-		c.HTML(http.StatusInternalServerError, "error.html", gin.H{
-			"message": "数据抓取失败，请稍后重试",
-		})
+		RenderPageError(c, http.StatusInternalServerError, "数据抓取失败，请稍后重试")
 		return
 	}
 
@@ -84,13 +85,18 @@ func (h *PRHandler) HandlePRPage(c *gin.Context) {
 
 // HandleRefresh POST /refresh — 手动刷新 PR 数据
 func (h *PRHandler) HandleRefresh(c *gin.Context) {
+	varyOnHTMXRequest(c)
 	username := c.PostForm("username")
 	if username == "" {
 		h.log.Warn().Str("client_ip", c.ClientIP()).Msg("[POST /refresh] missing username")
-		c.JSON(http.StatusBadRequest, gin.H{
-			"ok":      false,
-			"message": "缺少 username",
-		})
+		if isHTMXRequest(c) {
+			c.HTML(http.StatusUnprocessableEntity, "refresh_status", gin.H{
+				"Success": false,
+				"Message": "缺少 username",
+			})
+			return
+		}
+		RenderPageError(c, http.StatusBadRequest, "缺少 username")
 		return
 	}
 
@@ -101,10 +107,64 @@ func (h *PRHandler) HandleRefresh(c *gin.Context) {
 		h.log.Info().Str("username", username).Msg("[POST /refresh] rejected (queue full)")
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"ok":        submitted,
-		"message":   "刷新任务已提交，请稍后刷新页面",
-		"submitted": submitted,
+	message := "刷新任务已提交，请稍后刷新页面"
+	if !submitted {
+		message = "刷新队列繁忙，请稍后重试"
+	}
+
+	if !isHTMXRequest(c) {
+		query := url.Values{
+			"username":  {username},
+			"submitted": {"false"},
+		}
+		if submitted {
+			query.Set("submitted", "true")
+		}
+		c.Redirect(http.StatusSeeOther, "/refresh/status?"+query.Encode())
+		return
+	}
+	c.HTML(http.StatusOK, "refresh_status", gin.H{
+		"Success": submitted,
+		"Message": message,
+	})
+}
+
+// HandleRefreshStatus GET /refresh/status renders the result of a normal
+// browser refresh submission after the POST redirects here.
+func (h *PRHandler) HandleRefreshStatus(c *gin.Context) {
+	varyOnHTMXRequest(c)
+	username := c.Query("username")
+	if username == "" {
+		RenderPageError(c, http.StatusBadRequest, "缺少 username")
+		return
+	}
+
+	var submitted bool
+	switch c.Query("submitted") {
+	case "true":
+		submitted = true
+	case "false":
+	default:
+		RenderPageError(c, http.StatusBadRequest, "刷新结果参数无效")
+		return
+	}
+
+	message := "刷新任务已提交，请稍后刷新页面"
+	if !submitted {
+		message = "刷新队列繁忙，请稍后重试"
+	}
+	if isHTMXRequest(c) {
+		c.HTML(http.StatusOK, "refresh_status", gin.H{
+			"Success": submitted,
+			"Message": message,
+		})
+		return
+	}
+	c.HTML(http.StatusOK, "status.html", gin.H{
+		"Success":   submitted,
+		"Title":     "刷新请求处理完成",
+		"Message":   message,
+		"ReturnURL": "/pr?username=" + url.QueryEscape(username),
 	})
 }
 

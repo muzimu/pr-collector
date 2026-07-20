@@ -1,0 +1,16 @@
+{{define "card_preview"}}
+<div id="card-preview-result">
+  <div id="card-preview" class="preview-card">
+    {{if .CardGenerated}}
+    <img src="/card?username={{.CardUsername}}&top=3&style=default" alt="PR Collector Rank" style="max-width:100%">
+    {{else}}
+    <span class="preview-placeholder">预览将在此显示</span>
+    {{end}}
+  </div>
+  <div class="code-header">
+    <span class="code-label">Markdown 代码</span>
+    <button id="copy-btn" type="button" class="btn btn-sm">📋 一键复制</button>
+  </div>
+  <pre class="code-block"><code id="markdown-output">{{.CardMarkdown}}</code></pre>
+</div>
+{{end}}

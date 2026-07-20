@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  {{template "htmx_head" .}}
   <style>
     :root {
       --bg: #ffffff;
@@ -152,6 +153,24 @@
       font-size: 15px;
       color: var(--text-secondary);
     }
+
+    .refresh-form {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .refresh-status {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .refresh-success { color: #15803d; }
+    .refresh-error { color: #dc2626; }
+    .htmx-indicator { display: none; }
+    .htmx-request.htmx-indicator { display: inline; }
 
     .stats-row {
       display: flex;
@@ -373,6 +392,21 @@
         <h1 class="page-title">🐙 {{.Username}}'s Pull Requests</h1>
         <p class="page-subtitle">该用户贡献过的开源仓库与 Pull Request 列表</p>
       </div>
+      <form
+        class="refresh-form"
+        action="/refresh"
+        method="post"
+        hx-post="/refresh"
+        hx-target="#refresh-status"
+        hx-swap="innerHTML"
+        hx-indicator="#refresh-indicator"
+        hx-disabled-elt="find button"
+      >
+        <input type="hidden" name="username" value="{{.Username}}">
+        <button type="submit" class="btn btn-outline">刷新数据</button>
+        <span id="refresh-indicator" class="htmx-indicator" role="status">提交中...</span>
+        <div id="refresh-status" aria-live="polite"></div>
+      </form>
     </div>
 
     <div class="stats-row">
