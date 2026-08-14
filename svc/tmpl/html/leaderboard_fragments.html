@@ -30,8 +30,8 @@
       <span class="username">@{{.Username}}</span>
     </a>
   </div>
-  <div class="col-score">
-    <span class="score-value {{if ge .Score 90.0}}score-high{{else}}score-normal{{end}}">{{.Score}}</span>
+  <div class="col-score {{if ge .Score 90.0}}score-tier-90{{else if ge .Score 80.0}}score-tier-80{{else if ge .Score 70.0}}score-tier-70{{else}}score-tier-60{{end}}">
+    <span class="score-value">{{.Score}}</span>
     <div class="score-bar">
       <div class="score-bar-fill" style="width: {{.Score}}%"></div>
     </div>

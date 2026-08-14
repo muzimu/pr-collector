@@ -18,6 +18,10 @@
       --accent: #ea580c;
       --accent-hover: #c2410c;
       --green: #00bb7f;
+      --score-90: #047857;
+      --score-80: #2563eb;
+      --score-70: #b45309;
+      --score-60: #dc2626;
       --border: #e2e8f0;
       --bg-secondary: #f6f8fb;
       --gold: #f59e0b;
@@ -326,10 +330,13 @@
     .score-value {
       font-size: 16px;
       font-weight: 700;
+      color: var(--score-color, var(--text-secondary));
     }
 
-    .score-high { color: var(--green); }
-    .score-normal { color: var(--accent); }
+    .score-tier-90 { --score-color: var(--score-90); }
+    .score-tier-80 { --score-color: var(--score-80); }
+    .score-tier-70 { --score-color: var(--score-70); }
+    .score-tier-60 { --score-color: var(--score-60); }
 
     .score-bar {
       width: 60px;
@@ -343,11 +350,9 @@
     .score-bar-fill {
       height: 100%;
       border-radius: 2px;
+      background: var(--score-color, var(--accent));
       transition: width 0.6s ease;
     }
-
-    .score-high + .score-bar .score-bar-fill { background: var(--green); }
-    .score-normal + .score-bar .score-bar-fill { background: var(--accent); }
 
     .col-pr,
     .col-repos {
