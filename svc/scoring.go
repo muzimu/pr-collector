@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	defaultScoreMaxRaw = 100000.0
+	defaultScoreMaxRaw = 1000.0
 	minRepoStars       = 16
 	maxRepoStarFloor   = 200
 )

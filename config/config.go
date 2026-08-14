@@ -100,7 +100,7 @@ func (c *Config) applyDefaults() {
 		c.Cron.LeaderboardSync = "0 0 4 * * *"
 	}
 	if c.Cron.LeaderboardMaxRaw == 0 {
-		c.Cron.LeaderboardMaxRaw = 100000
+		c.Cron.LeaderboardMaxRaw = 1000
 	}
 	if c.Cron.SVGCacheTTL == 0 {
 		c.Cron.SVGCacheTTL = 24 * time.Hour

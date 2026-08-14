@@ -100,7 +100,7 @@ func TestScoringServiceEmptyDeps(t *testing.T) {
 	if s == nil {
 		t.Fatal("expected non-nil service")
 	}
-	if s.maxRaw != 100000 {
-		t.Errorf("maxRaw = %v, want 100000", s.maxRaw)
+	if s.maxRaw != 1000 {
+		t.Errorf("maxRaw = %v, want 1000", s.maxRaw)
 	}
 }

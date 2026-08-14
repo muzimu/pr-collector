@@ -112,7 +112,7 @@ redis:
 cron:
   full_sync: "0 0 3 * * *"       # 全量同步（秒 分 时 日 月 周）
   leaderboard_sync: "0 0 4 * * *" # 排行榜缓存刷新
-  leaderboard_max_raw: 100000     # 排行榜分数 raw 上限
+  leaderboard_max_raw: 1000       # 排行榜分数 raw 上限
   svg_cache_ttl: 24h             # SVG 缓存 TTL
   fetch_lock_ttl: 60s            # 分布式锁 TTL
   max_workers: 5                 # 同步并发数
