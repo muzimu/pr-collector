@@ -6,7 +6,6 @@ import (
 	"fmt"
 	htmltemplate "html/template"
 	"io/fs"
-	"math"
 	"pr-collector/github"
 	"sort"
 	"strconv"
@@ -49,6 +48,7 @@ type Renderer struct {
 	svgTemplates  map[string]*texttemplate.Template
 	htmlTemplates *htmltemplate.Template
 	staticFiles   fs.FS
+	scoreMaxRaw   float64
 }
 
 // repoAgg 仓库聚合（用于 RenderSVG 内部分组统计）
@@ -56,8 +56,6 @@ type repoAgg struct {
 	stars   int
 	prCount int
 }
-
-const badgeScoreMaxRaw = 100000.0
 
 // truncateName 截断过长的仓库名，避免单个 chip 超出卡片宽度
 func truncateName(name string, maxLen int) string {
@@ -86,21 +84,13 @@ func formatStars(n int) string {
 	}
 }
 
-// calculateBadgeScore 根据仓库 star 分布计算 Trend Score（映射到 [50, 100]）
-func calculateBadgeScore(repoMap map[string]*repoAgg) float64 {
-	raw := 0.0
-	for _, ra := range repoMap {
-		raw += float64(ra.prCount) * math.Log2(float64(ra.stars)+1)
-	}
-	score := 50.0 + 50.0*math.Log10(raw+1)/math.Log10(badgeScoreMaxRaw+1)
-	if score > 100 {
-		score = 100
-	}
-	return score
-}
-
 // NewRenderer 加载并编译全部模板
 func NewRenderer() (*Renderer, error) {
+	return NewRendererWithScoreMaxRaw(0)
+}
+
+// NewRendererWithScoreMaxRaw 使用指定 raw 上限加载并编译全部模板
+func NewRendererWithScoreMaxRaw(maxRaw int) (*Renderer, error) {
 	// 自定义模板函数
 	funcMap := texttemplate.FuncMap{
 		"add": func(a, b int) int { return a + b },
@@ -150,6 +140,7 @@ func NewRenderer() (*Renderer, error) {
 		svgTemplates:  svgTemplates,
 		htmlTemplates: htmlTemplates,
 		staticFiles:   staticFiles,
+		scoreMaxRaw:   normalizeScoreMaxRaw(maxRaw),
 	}, nil
 }
 
@@ -174,8 +165,8 @@ func (r *Renderer) RenderSVG(username, style string, prs []github.PRInfo, topN i
 	}
 	data.TotalRepos = len(repoMap)
 
-	// Trend Score：复用排行榜对数压缩公式，默认 raw 上限 100000
-	data.Score = calculateBadgeScore(repoMap)
+	// Trend Score：复用排行榜评分规则
+	data.Score = calculateScore(calculateRawScore(prs).raw, r.scoreMaxRaw)
 
 	// Top N：按 Stars 降序排列
 	if topN > 0 && len(repoMap) > 0 {

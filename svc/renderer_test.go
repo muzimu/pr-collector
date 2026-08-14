@@ -2,9 +2,12 @@ package svc
 
 import (
 	"bytes"
+	"fmt"
 	"io/fs"
 	"strings"
 	"testing"
+
+	"pr-collector/github"
 )
 
 func TestRendererEmbedsHTMXAndParsesFragments(t *testing.T) {
@@ -58,5 +61,23 @@ func TestRendererEmbedsHTMXAndParsesFragments(t *testing.T) {
 	}
 	if strings.Contains(rendered.String(), "ZgotmplZ") {
 		t.Fatal("status page contains a template escaping error")
+	}
+}
+
+func TestRendererUsesLeaderboardScore(t *testing.T) {
+	renderer, err := NewRendererWithScoreMaxRaw(100000)
+	if err != nil {
+		t.Fatalf("NewRendererWithScoreMaxRaw() error = %v", err)
+	}
+	prs := []github.PRInfo{
+		{Repo: "a/b", RepoStars: 1023},
+		{Repo: "a/b", RepoStars: 1023},
+		{Repo: "c/d", RepoStars: 1},
+	}
+
+	svg := renderer.RenderSVG("alice", "default", prs, 0)
+	want := calculateScore(calculateRawScore(prs).raw, 100000)
+	if !strings.Contains(svg, fmt.Sprintf(">%.1f</text>", want)) {
+		t.Fatalf("rendered SVG does not contain leaderboard score %.1f", want)
 	}
 }

@@ -81,7 +81,7 @@ func main() {
 	// PR 数据提供者：封装"优先缓存，缓存未命中则同步抓取"逻辑
 	prProvider := svc.NewPRProvider(store, fetcher, 20*time.Second, log)
 
-	renderer, err := svc.NewRenderer()
+	renderer, err := svc.NewRendererWithScoreMaxRaw(cfg.Cron.LeaderboardMaxRaw)
 	if err != nil {
 		log.Fatal().Err(err).Msg("renderer init failed")
 	}

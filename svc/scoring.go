@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sort"
 	"sync"
 	"time"
 
@@ -12,6 +13,12 @@ import (
 
 	"pr-collector/github"
 	"pr-collector/redis/cache"
+)
+
+const (
+	defaultScoreMaxRaw = 100000.0
+	minRepoStars       = 16
+	maxRepoStarFloor   = 200
 )
 
 // ScoringService 评分计算服务
@@ -24,13 +31,10 @@ type ScoringService struct {
 
 // NewScoringService 创建评分服务
 func NewScoringService(store *cache.Store, maxRaw int, log zerolog.Logger) *ScoringService {
-	if maxRaw <= 0 {
-		maxRaw = 100000
-	}
 	return &ScoringService{
 		store:  store,
 		log:    log,
-		maxRaw: float64(maxRaw),
+		maxRaw: normalizeScoreMaxRaw(maxRaw),
 	}
 }
 
@@ -42,36 +46,60 @@ type rawScore struct {
 	repoCount int
 }
 
-// CalculateScore 将对数压缩 raw 分映射到 [50, 100]
-// score = 50 + 50 * log2(raw + 1) / log2(maxRaw + 1)
+// CalculateScore 将对数压缩 raw 分映射到 [60, 100]
+// score = 60 + 40 * log2(raw + 1) / log2(maxRaw + 1)
 func (s *ScoringService) CalculateScore(raw float64) float64 {
+	return calculateScore(raw, s.maxRaw)
+}
+
+func calculateScore(raw, maxRaw float64) float64 {
 	if raw <= 0 {
-		return 50.0
+		return 60.0
 	}
-	if raw >= s.maxRaw {
+	if raw >= maxRaw {
 		return 100.0
 	}
-	score := 50.0 + 50.0*math.Log2(raw+1)/math.Log2(s.maxRaw+1)
+	score := 60.0 + 40.0*math.Log2(raw+1)/math.Log2(maxRaw+1)
 	return math.Round(score*10) / 10
 }
 
-// calculateRawScore 计算单个用户的原始分
-func (s *ScoringService) calculateRawScore(prs []github.PRInfo) rawScore {
+func normalizeScoreMaxRaw(maxRaw int) float64 {
+	if maxRaw <= 0 {
+		return defaultScoreMaxRaw
+	}
+	return float64(maxRaw)
+}
+
+// calculateRawScore 计算单个用户的原始分。
+// 低于用户仓库 star 下四分位（且至少 16 star）的仓库不计分；同仓库 PR 对数衰减。
+func calculateRawScore(prs []github.PRInfo) rawScore {
 	// 注意：传入的 prs 应当已经是 merged 过滤后的结果
-	repoMap := make(map[string]struct {
+	type repoScore struct {
 		stars   int
 		prCount int
-	})
+	}
+	repoMap := make(map[string]repoScore)
 	for _, pr := range prs {
 		r := repoMap[pr.Repo]
-		r.stars = pr.RepoStars
+		if pr.RepoStars > r.stars {
+			r.stars = pr.RepoStars
+		}
 		r.prCount++
 		repoMap[pr.Repo] = r
 	}
 
+	stars := make([]int, 0, len(repoMap))
+	for _, r := range repoMap {
+		stars = append(stars, r.stars)
+	}
+	threshold := repoStarThreshold(stars)
+
 	raw := 0.0
 	for _, r := range repoMap {
-		raw += float64(r.prCount) * math.Log2(float64(r.stars)+1)
+		if r.stars < threshold {
+			continue
+		}
+		raw += math.Log2(float64(r.stars)+1) * math.Log2(float64(r.prCount)+1)
 	}
 
 	return rawScore{
@@ -79,6 +107,22 @@ func (s *ScoringService) calculateRawScore(prs []github.PRInfo) rawScore {
 		prCount:   len(prs),
 		repoCount: len(repoMap),
 	}
+}
+
+func repoStarThreshold(stars []int) int {
+	if len(stars) == 0 {
+		return minRepoStars
+	}
+
+	sort.Ints(stars)
+	threshold := stars[(len(stars)-1)/4]
+	if threshold < minRepoStars {
+		return minRepoStars
+	}
+	if threshold > maxRepoStarFloor {
+		return maxRepoStarFloor
+	}
+	return threshold
 }
 
 // CalculateAllScores 计算所有用户原始分
@@ -93,7 +137,7 @@ func (s *ScoringService) CalculateAllScores(ctx context.Context) ([]rawScore, er
 		prs, err := s.store.GetPRList(ctx, username)
 		if err != nil {
 			if err == redis.Nil {
-				// 用户无 PR 数据：按 0 PR 处理，仍可入榜（50 分）
+				// 用户无 PR 数据：按 0 PR 处理，仍可入榜（60 分）
 				scores = append(scores, rawScore{username: username})
 				continue
 			}
@@ -102,10 +146,10 @@ func (s *ScoringService) CalculateAllScores(ctx context.Context) ([]rawScore, er
 		}
 
 		merged := filterMerged(prs)
-		score := s.calculateRawScore(merged)
+		score := calculateRawScore(merged)
 		score.username = username
 		if score.prCount == 0 {
-			// 有缓存但无 merged PR，仍保留在榜中（50 分）
+			// 有缓存但无 merged PR，仍保留在榜中（60 分）
 		}
 		scores = append(scores, score)
 	}
@@ -125,7 +169,7 @@ func (s *ScoringService) CalculateUserScore(ctx context.Context, username string
 	}
 
 	merged := filterMerged(prs)
-	raw := s.calculateRawScore(merged)
+	raw := calculateRawScore(merged)
 	return cache.LeaderboardUser{
 		Username:  username,
 		Score:     s.CalculateScore(raw.raw),
@@ -252,4 +296,3 @@ func (s *ScoringService) GetStats(ctx context.Context) (cache.LeaderboardMeta, e
 	}
 	return meta, nil
 }
-
