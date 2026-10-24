@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -81,7 +82,7 @@ query($queryString: String!, $cursor: String) {
 	var cursor string
 
 	for {
-		variables := map[string]interface{}{
+		variables := map[string]any{
 			"queryString": fmt.Sprintf(
 				"is:pr author:%s archived:false is:merged is:public sort:created-desc",
 				username,
@@ -96,29 +97,29 @@ query($queryString: String!, $cursor: String) {
 			return nil, fmt.Errorf("graphql request failed: %w", err)
 		}
 
-		search, ok := data["search"].(map[string]interface{})
+		search, ok := data["search"].(map[string]any)
 		if !ok || search == nil {
 			return nil, fmt.Errorf("unexpected response: missing search field")
 		}
 
-		edges, ok := search["edges"].([]interface{})
+		edges, ok := search["edges"].([]any)
 		if !ok {
 			c.log.Warn().Str("user", username).Msg("search edges is not an array, skipping page")
 			break
 		}
 
 		for _, edge := range edges {
-			edgeMap, ok := edge.(map[string]interface{})
+			edgeMap, ok := edge.(map[string]any)
 			if !ok || edgeMap == nil {
 				continue
 			}
 
-			node, ok := edgeMap["node"].(map[string]interface{})
+			node, ok := edgeMap["node"].(map[string]any)
 			if !ok || node == nil {
 				continue
 			}
 
-			repo, ok := node["repository"].(map[string]interface{})
+			repo, ok := node["repository"].(map[string]any)
 			if !ok || repo == nil {
 				continue
 			}
@@ -134,7 +135,7 @@ query($queryString: String!, $cursor: String) {
 			allPRs = append(allPRs, pr)
 		}
 
-		pageInfo, ok := search["pageInfo"].(map[string]interface{})
+		pageInfo, ok := search["pageInfo"].(map[string]any)
 		if !ok || pageInfo == nil {
 			break
 		}
@@ -160,7 +161,7 @@ query($queryString: String!, $cursor: String) {
 }
 
 // parsePRNode 安全解析单条 PR 节点，返回解析结果和是否成功
-func (c *Client) parsePRNode(node, repo map[string]interface{}) (PRInfo, bool) {
+func (c *Client) parsePRNode(node, repo map[string]any) (PRInfo, bool) {
 	pr := PRInfo{}
 
 	// number (JSON float64 → int)
@@ -217,8 +218,8 @@ const (
 	maxRetries     = 10
 )
 
-func (c *Client) doRequest(query string, variables map[string]interface{}) (map[string]interface{}, error) {
-	payload := map[string]interface{}{
+func (c *Client) doRequest(query string, variables map[string]any) (map[string]any, error) {
+	payload := map[string]any{
 		"query":     query,
 		"variables": variables,
 	}
@@ -227,7 +228,7 @@ func (c *Client) doRequest(query string, variables map[string]interface{}) (map[
 		return nil, fmt.Errorf("marshal request body: %w", err)
 	}
 
-	for attempt := 0; attempt < maxRetries; attempt++ {
+	for attempt := range maxRetries {
 		req, err := http.NewRequest(http.MethodPost, graphqlURL, bytes.NewReader(body))
 		if err != nil {
 			return nil, fmt.Errorf("create request: %w", err)
@@ -251,7 +252,7 @@ func (c *Client) doRequest(query string, variables map[string]interface{}) (map[
 			continue
 		}
 
-		var result map[string]interface{}
+		var result map[string]any
 		if err := json.Unmarshal(respBody, &result); err != nil {
 			c.log.Warn().
 				Err(err).
@@ -266,7 +267,7 @@ func (c *Client) doRequest(query string, variables map[string]interface{}) (map[
 			// 检查 GraphQL errors
 			errorsRaw, hasErrors := result["errors"]
 			if !hasErrors {
-				data, _ := result["data"].(map[string]interface{})
+				data, _ := result["data"].(map[string]any)
 				if data == nil {
 					return nil, fmt.Errorf("unexpected response: missing data field")
 				}
@@ -312,8 +313,8 @@ func (c *Client) doRequest(query string, variables map[string]interface{}) (map[
 }
 
 // formatGraphQLErrors 安全解析 GraphQL errors 字段，拼接错误消息
-func (c *Client) formatGraphQLErrors(errorsRaw interface{}) string {
-	errors, ok := errorsRaw.([]interface{})
+func (c *Client) formatGraphQLErrors(errorsRaw any) string {
+	errors, ok := errorsRaw.([]any)
 	if !ok {
 		// 可能是单个对象或字符串
 		return fmt.Sprintf("%v", errorsRaw)
@@ -321,7 +322,7 @@ func (c *Client) formatGraphQLErrors(errorsRaw interface{}) string {
 
 	parts := make([]string, 0, len(errors))
 	for _, e := range errors {
-		if errMap, ok := e.(map[string]interface{}); ok {
+		if errMap, ok := e.(map[string]any); ok {
 			if msg, ok := errMap["message"].(string); ok {
 				parts = append(parts, msg)
 			}
@@ -353,8 +354,8 @@ func (c *Client) parseRateLimitReset(resp *http.Response) float64 {
 	return wait
 }
 
-func (c *Client) calcRateLimitWait(data map[string]interface{}) (float64, bool) {
-	rateLimit, ok := data["rateLimit"].(map[string]interface{})
+func (c *Client) calcRateLimitWait(data map[string]any) (float64, bool) {
+	rateLimit, ok := data["rateLimit"].(map[string]any)
 	if !ok {
 		return 60, false
 	}
@@ -378,20 +379,14 @@ func (c *Client) calcRateLimitWait(data map[string]interface{}) (float64, bool) 
 	return waitSeconds, false
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func joinStrings(parts []string, sep string) string {
 	if len(parts) == 0 {
 		return ""
 	}
-	result := parts[0]
+	var result strings.Builder
+	result.WriteString(parts[0])
 	for i := 1; i < len(parts); i++ {
-		result += sep + parts[i]
+		result.WriteString(sep + parts[i])
 	}
-	return result
+	return result.String()
 }

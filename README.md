@@ -2,7 +2,7 @@
 
 GitHub PR 贡献徽章服务 — 在 Profile README 中嵌入 SVG 徽章，展示个人 Pull Request 统计。
 
-![Go](https://img.shields.io/badge/Go-1.26.2-00ADD8?logo=go)
+![Go](https://img.shields.io/badge/Go-1.27.3-00ADD8?logo=go)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 ---
@@ -54,7 +54,7 @@ Web 框架    Gin
 
 ## 环境要求
 
-- **Go** 1.26.2（见 `go.mod`）
+- **Go** 1.27.3（见 `go.mod`）
 - **Redis** 7.0+
 - **系统** Linux（systemd 部署）/ macOS、Windows（本地运行或对应平台二进制）
 - **GitHub Token** Personal Access Token（classic，scope: `read:user`）

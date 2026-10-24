@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -153,9 +154,7 @@ func (h *LeaderboardHandler) renderIndex(c *gin.Context, offset, limit int, noti
 	data := leaderboardData(users, total, offset, limit)
 	data["Stats"] = meta
 	data["Notice"] = notice
-	for key, value := range cardPreviewData(h.baseURL(c), cardUsername, cardUsername != "") {
-		data[key] = value
-	}
+	maps.Copy(data, cardPreviewData(h.baseURL(c), cardUsername, cardUsername != ""))
 	c.HTML(http.StatusOK, "index.html", data)
 }
 

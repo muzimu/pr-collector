@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rs/zerolog"
 	"pr-collector/github"
 	"pr-collector/redis/cache"
-	"github.com/rs/zerolog"
 )
 
 const (
@@ -205,10 +205,8 @@ func (f *Fetcher) FetchAllUsers(maxWorkers int) (success, fail int) {
 	results := make(chan result, len(usernames))
 
 	var wg sync.WaitGroup
-	for i := 0; i < maxWorkers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range maxWorkers {
+		wg.Go(func() {
 			for username := range jobs {
 				select {
 				case <-ctx.Done():
@@ -237,7 +235,7 @@ func (f *Fetcher) FetchAllUsers(maxWorkers int) (success, fail int) {
 				_ = f.store.Unlock(context.Background(), username)
 				results <- result{user: username}
 			}
-		}()
+		})
 	}
 
 	// 投递所有任务

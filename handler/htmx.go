@@ -19,7 +19,7 @@ func isHTMXRequest(c *gin.Context) bool {
 func varyOnHTMXRequest(c *gin.Context) {
 	header := c.Writer.Header()
 	for _, value := range header.Values("Vary") {
-		for _, token := range strings.Split(value, ",") {
+		for token := range strings.SplitSeq(value, ",") {
 			if strings.EqualFold(strings.TrimSpace(token), htmxRequestHeader) {
 				return
 			}
