@@ -331,7 +331,7 @@ func (c *Client) formatGraphQLErrors(errorsRaw any) string {
 	if len(parts) == 0 {
 		return "unknown graphql error"
 	}
-	return fmt.Sprintf("%s", joinStrings(parts, "; "))
+	return strings.Join(parts, "; ")
 }
 
 // parseRateLimitReset 解析 HTTP 429/403 响应中的 x-ratelimit-reset 头
@@ -377,16 +377,4 @@ func (c *Client) calcRateLimitWait(data map[string]any) (float64, bool) {
 		return waitSeconds, true
 	}
 	return waitSeconds, false
-}
-
-func joinStrings(parts []string, sep string) string {
-	if len(parts) == 0 {
-		return ""
-	}
-	var result strings.Builder
-	result.WriteString(parts[0])
-	for i := 1; i < len(parts); i++ {
-		result.WriteString(sep + parts[i])
-	}
-	return result.String()
 }
